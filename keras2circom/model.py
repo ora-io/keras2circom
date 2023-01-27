@@ -37,7 +37,7 @@ poly_activation = '4wEAAAAAAAAAAAAAAAEAAAACAAAAQwAAAHMMAAAAfABkARMAfAAXAFMAKQJO6
 # read each layer in a model and convert it to a class called Layer
 @dataclass
 class Layer:
-    """ A single layer in a Keras model. """
+    ''' A single layer in a Keras model. '''
     op: str
     name: str
     input: typing.List[int]
@@ -57,7 +57,7 @@ class Model:
     layers: typing.List[Layer]
 
     def __init__(self, filename: str, raw: bool = False):
-        """ Load a Keras model from a file. """
+        ''' Load a Keras model from a file. '''
         model = load_model(filename)
         
         self.layers = [Layer(layer) for layer in model.layers if layer.__class__.__name__ not in skip_ops]
