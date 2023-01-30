@@ -5,7 +5,6 @@ import typing
 from tensorflow.keras.models import load_model
 from tensorflow.keras.layers import Layer as KerasLayer
 import numpy as np
-from difflib import SequenceMatcher
 
 supported_ops = [
     'Activation',
@@ -19,12 +18,7 @@ supported_ops = [
     'Lambda', # only for polynomial activation in the form of `Lambda(lambda x: x**2+x)`
     'MaxPooling2D',
     'ReLU',
-]
-
-argmax_ops = [
-    'Activation',
     'Softmax',
-    'Dense',
 ]
 
 skip_ops = [
@@ -60,29 +54,12 @@ class Model:
         ''' Load a Keras model from a file. '''
         model = load_model(filename)
         
-        self.layers = [Layer(layer) for layer in model.layers if layer.__class__.__name__ not in skip_ops]
-        
-        end = len(self.layers)
-
-        # check if the last layer is argmax
-        if not raw:
-            if self.layers[-1].op not in argmax_ops:
-                raise ValueError('Last layer must be Softmax, Activation, or Dense')
-            if 'activation' in self.layers[-1].config:
-                if self.layers[-1].config['activation'] != 'softmax':
-                    raise ValueError('Activation of last layer must be softmax')
-        else:
-            if self.layers[-1].op not in supported_ops+argmax_ops:
-                raise ValueError('Last layer must be supported op, Softmax, Activation, or Dense')
-        
-        for layer in self.layers[:-1]:
-            if layer.op not in supported_ops:
-                raise ValueError(f'Unsupported op: {layer.op}')
-            if layer.op == 'Lambda':
-                s = SequenceMatcher(None, layer.config['function'][0], poly_activation)
-                if s.ratio() < 0.99:
-                    raise ValueError('Unsupported lambda function')
-            if 'activation' in layer.config:
-                if layer.config['activation'] not in ['linear', 'relu']:
-                    print(layer.config['activation'])
-                    raise ValueError('Unsupported activation function')
+        self.layers = [Layer(layer) for layer in model.layers if self._for_transpilation(layer.__class__.__name__)]
+    
+    @staticmethod
+    def _for_transpilation(op: str) -> bool:
+        if op in skip_ops:
+            return False
+        if op in supported_ops:
+            return True
+        raise NotImplementedError(f'Unsupported op: {op}')
