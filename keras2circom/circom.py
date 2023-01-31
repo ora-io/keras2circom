@@ -16,12 +16,12 @@ class SafeDict(dict):
     def __missing__(self, key):
         return '{' + key + '}'
 
-circom_template_string = '''
-pragma circom 2.0.0;
+circom_template_string = '''pragma circom 2.0.0;
 
 {include}
 template Model() {brace_left}
 {signal}
+{component}
 {main}
 {brace_right}
 
@@ -32,20 +32,17 @@ templates: typing.Dict[str, Template] = {
 
 }
 
-def inject(template, key, code) -> str:
-    ''' helper function to auto inject sections. '''
-    # append key to the end
-    code += '{{{}}}'.format(key)
-    return template.format_map(SafeDict({key: code}))
-
-def inject_main(template, code) -> str:
-    return inject(template, 'main', code + '\n')
-
-def inject_signal(template, code) -> str:
-    return inject(template, 'signal', code + '\n')
-
-def inject_include(template, code) -> str:
-    return inject(template, 'include', code + '\n')
+def parse_shape(shape: typing.List[int]):
+    shape_str = ''
+    for dim in shape:
+        shape_str += '[{}]'.format(dim)
+    return shape_str
+    
+def parse_index(shape: typing.List[int]):
+    index_str = ''
+    for i in range(len(shape)):
+        index_str += '[i{}]'.format(i)
+    return index_str
 
 @dataclass
 class Template:
@@ -123,6 +120,39 @@ class Signal:
     shape: typing.List[int]
     value: typing.Any = None
 
+    def inject_signal(self, compName: str):
+        if self.value is not None:
+            return 'signal input {}_{}{};\n'.format(
+                    compName, self.name, parse_shape(self.shape))
+        return ''
+    
+    def inject_main(self, compName: str, prevSignal: Signal):
+        inject_str = ''
+        if self.value is None:
+            if self.shape != prevSignal.shape:
+                raise ValueError('shape mismatch: {} vs. {}'.format(self.shape, prevSignal.shape))
+            for i in range(len(self.shape)):
+                inject_str += '{}for (var i{} = 0; i{} < {}; i{}++) {{\n'.format(
+                            ' '*i*4, i, i, self.shape[i], i)
+            inject_str += '{}{}_{}{} <== {}_{}{};\n'.format(' '*(i+1)*4,
+                        compName, self.name, parse_index(self.shape),
+                        compName, prevSignal.name, parse_index(self.shape))
+        return inject_str
+    
+    def inject_input_signal(self):
+        if self.value is not None:
+            raise ValueError('input signal should not have value')
+        return 'signal input in{};\n'.format(parse_shape(self.shape))
+    
+    def inject_output_signal(self):
+        if self.value is not None:
+            raise ValueError('output signal should not have value')
+        return 'signal output out{};\n'.format(parse_shape(self.shape))
+    
+    # TODO: inject_output_main
+    
+
+
 @dataclass
 class Component:
     name: str
@@ -131,6 +161,55 @@ class Component:
     outputs: typing.List[Signal]
     # optional args
     args: typing.Dict[str, typing.Any] = None
+
+    def inject_include(self):
+        return 'include "{}";\n'.format(self.template.fpath)
+    
+    def inject_signal(self, prevComponent: Component = None, lastComponent: bool = False):
+        inject_str = ''
+        for signal in self.inputs:
+            if signal.value is None and prevComponent is None:
+                inject_str += signal.inject_input_signal()
+            elif signal.value is not None:
+                inject_str += signal.inject_signal(self.name)
+        for signal in self.outputs:
+            if signal.value is None and lastComponent is True:
+                inject_str += signal.inject_output_signal()
+        return inject_str
+    
+    def inject_component(self):
+        if self.template.op_name == 'ReLU':
+            inject_str = 'component {}{};\n'.format(self.name, parse_shape(self.outputs[0].shape))
+            for i in range(len(self.outputs[0].shape)):
+                inject_str += '{}for (var i{} = 0; i{} < {}; i{}++) {{\n'.format(
+                            ' '*i*4, i, i, self.outputs[0].shape[i], i)
+            inject_str += '{}{}{} <== ReLU();\n'.format(' '*(i+1)*4,
+                        self.name, parse_index(self.outputs[0].shape))
+            return inject_str
+        
+        # TODO: need to handle scaling with Poly
+        if self.template.op_name == 'Poly':
+            return ''
+
+        return 'component {} = {}({});\n'.format(
+            self.name, self.template.op_name, self.parse_args(self.template.args, self.args))
+
+    # TODO: fix inject_main
+    def inject_main(self, prevComponent: Component, lastComponent: bool = False):
+        inject_str = ''
+        for signal in self.inputs:
+            if signal.value is None:
+                inject_str += signal.inject_main(self.name, prevComponent.outputs[0])
+        if lastComponent:
+            for signal in self.outputs:
+                if signal.value is None:
+                    inject_str += signal.inject_main(self.name, prevComponent.outputs[0])
+        return inject_str
+    
+    @staticmethod
+    def parse_args(template_args: typing.List[str], args: typing.Dict[str, typing.Any]):
+        args_str = '{'+'}, {'.join(template_args)+'}'
+        return args_str.format(**args)
 
 @dataclass
 class Circuit:
@@ -145,13 +224,35 @@ class Circuit:
     def add_components(self, components: typing.List[Component]):
         self.components.extend(components)
 
-    def to_circom(self):
-        template = circom_template_string
-        for template in templates.values():
-            template.inject_include(template)
-
+    def inject_include(self):
+        inject_str = []
         for component in self.components:
-            template.inject_signal(template, component.inject_signal())
-            template.inject_main(template, component.inject_main())
+            inject_str.append(component.inject_include())
+        return ''.join(set(inject_str))
 
-        return template
+    def inject_signal(self):
+        inject_str = self.components[0].inject_signal()
+        for i in range(1, len(self.components)):
+            inject_str += self.components[i].inject_signal(self.components[i-1], i==len(self.components)-1)
+        return inject_str
+
+    def inject_component(self):
+        inject_str = ''
+        for component in self.components:
+            inject_str += component.inject_component()
+        return inject_str
+    
+    # TODO: fix inject_main
+    def inject_main(self):
+        return ''
+        
+
+    def to_circom(self):
+        return circom_template_string.format(**{
+            'include': self.inject_include(),
+            'brace_left': '{',
+            'signal': self.inject_signal(),
+            'component': self.inject_component(),
+            'main': '',
+            'brace_right': '}',
+        })
