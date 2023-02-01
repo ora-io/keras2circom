@@ -126,17 +126,37 @@ class Signal:
                     compName, self.name, parse_shape(self.shape))
         return ''
     
-    def inject_main(self, compName: str, prevSignal: Signal):
+    def inject_main(self, compName: str, prevCompName: str = None, prevSignal: Signal = None):
         inject_str = ''
-        if self.value is None:
-            if self.shape != prevSignal.shape:
-                raise ValueError('shape mismatch: {} vs. {}'.format(self.shape, prevSignal.shape))
+        if self.value is not None:
             for i in range(len(self.shape)):
                 inject_str += '{}for (var i{} = 0; i{} < {}; i{}++) {{\n'.format(
                             ' '*i*4, i, i, self.shape[i], i)
-            inject_str += '{}{}_{}{} <== {}_{}{};\n'.format(' '*(i+1)*4,
+            inject_str += '{}{}.{}{} <== {}_{}{};\n'.format(' '*(i+1)*4,
                         compName, self.name, parse_index(self.shape),
-                        compName, prevSignal.name, parse_index(self.shape))
+                        compName, self.name, parse_index(self.shape))
+            return inject_str
+        
+        if self.shape != prevSignal.shape:
+            raise ValueError('shape mismatch: {} vs. {}'.format(self.shape, prevSignal.shape))
+            
+        for i in range(len(self.shape)):
+            inject_str += '{}for (var i{} = 0; i{} < {}; i{}++) {{\n'.format(
+                            ' '*i*4, i, i, self.shape[i], i)
+        
+        # TODO: fix this
+        if 're_lu' in compName or 'lambda' in compName or 'softmax' in compName:
+            inject_str += '{}{}{}.{} <== {}.{}{};\n'.format(' '*(i+1)*4,
+                        compName, parse_index(self.shape), self.name,
+                        prevCompName, prevSignal.name, parse_index(self.shape))
+        elif 're_lu' in prevCompName or 'lambda' in prevCompName or 'softmax' in prevCompName:
+            inject_str += '{}{}.{}{} <== {}{}.{};\n'.format(' '*(i+1)*4,
+                        compName, self.name, parse_index(self.shape),
+                        prevCompName, parse_index(self.shape), prevSignal.name)
+        else:
+            inject_str += '{}{}.{}{} <== {}.{}{};\n'.format(' '*(i+1)*4,
+                        compName, self.name, parse_index(self.shape),
+                        prevCompName, prevSignal.name, parse_index(self.shape))
         return inject_str
     
     def inject_input_signal(self):
@@ -149,7 +169,33 @@ class Signal:
             raise ValueError('output signal should not have value')
         return 'signal output out{};\n'.format(parse_shape(self.shape))
     
-    # TODO: inject_output_main
+    def inject_input_main(self, compName: str):
+        if self.value is not None:
+            raise ValueError('input signal should not have value')
+        inject_str = ''
+        for i in range(len(self.shape)):
+            inject_str += '{}for (var i{} = 0; i{} < {}; i{}++) {{\n'.format(
+                        ' '*i*4, i, i, self.shape[i], i)
+        inject_str += '{}{}.{}{} <== in{};\n'.format(' '*(i+1)*4,
+                    compName, self.name, parse_index(self.shape),
+                    parse_index(self.shape))
+        return inject_str
+    
+    def inject_output_main(self, prevCompName: str, prevSignal: Signal):
+        if self.value is not None:
+            raise ValueError('output signal should not have value')
+        if self.shape != prevSignal.shape:
+            raise ValueError('shape mismatch: {} vs. {}'.format(self.shape, prevSignal.shape))
+        inject_str = ''
+        for i in range(len(self.shape)):
+            inject_str += '{}for (var i{} = 0; i{} < {}; i{}++) {{\n'.format(
+                        ' '*i*4, i, i, self.shape[i], i)
+        inject_str += '{}out{} <== {}.{}{};\n'.format(' '*(i+1)*4,
+                    parse_index(self.shape),
+                    prevCompName, prevSignal.name, parse_index(self.shape))
+        return inject_str
+
+    # TODO: special handling for activations
     
 
 
@@ -195,15 +241,18 @@ class Component:
             self.name, self.template.op_name, self.parse_args(self.template.args, self.args))
 
     # TODO: fix inject_main
-    def inject_main(self, prevComponent: Component, lastComponent: bool = False):
+    def inject_main(self, prevComponent: Component = None, lastComponent: bool = False):
         inject_str = ''
         for signal in self.inputs:
-            if signal.value is None:
-                inject_str += signal.inject_main(self.name, prevComponent.outputs[0])
+            if signal.value is not None:
+                inject_str += signal.inject_main(self.name)
+            elif prevComponent is None:
+                inject_str += signal.inject_input_main(self.name)
+            else:
+                inject_str += signal.inject_main(self.name, prevComponent.name, prevComponent.outputs[0])
         if lastComponent:
             for signal in self.outputs:
-                if signal.value is None:
-                    inject_str += signal.inject_main(self.name, prevComponent.outputs[0])
+                inject_str += signal.inject_output_main(self.name, signal)
         return inject_str
     
     @staticmethod
@@ -244,7 +293,10 @@ class Circuit:
     
     # TODO: fix inject_main
     def inject_main(self):
-        return ''
+        inject_str = self.components[0].inject_main()
+        for i in range(1, len(self.components)):
+            inject_str += self.components[i].inject_main(self.components[i-1], i==len(self.components)-1)
+        return inject_str
         
 
     def to_circom(self):
@@ -253,6 +305,6 @@ class Circuit:
             'brace_left': '{',
             'signal': self.inject_signal(),
             'component': self.inject_component(),
-            'main': '',
+            'main': self.inject_main(),
             'brace_right': '}',
         })
