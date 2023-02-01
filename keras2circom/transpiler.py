@@ -7,6 +7,7 @@ from difflib import SequenceMatcher
 poly_activation = '4wEAAAAAAAAAAAAAAAEAAAACAAAAQwAAAHMMAAAAfABkARMAfAAXAFMAKQJO6QIAAACpACkB2gF4\ncgIAAAByAgAAAHpOL3Zhci9mb2xkZXJzL2d0L3NnM3Y4cmQxM2w1Mmp4OTFtZmJnemJmYzAwMDBn\nbi9UL2lweWtlcm5lbF8xNTU3MS8yMTc2NzAzOTE5LnB52gg8bGFtYmRhPggAAADzAAAAAA==\n'
 
 def transpile(filename: str, output_dir: str = 'output', raw: bool = False) -> Circuit:
+    ''' Transpile a Keras model to a CIRCOM circuit.'''
     
     model = Model(filename, raw)
 
@@ -32,6 +33,7 @@ def transpile(filename: str, output_dir: str = 'output', raw: bool = False) -> C
     return circuit
 
 def transpile_layer(layer: Layer, last: bool = False) -> typing.List[Component]:
+    ''' Transpile a Keras layer to CIRCOM component(s).'''
     if layer.op == 'Activation':
         if layer.config['activation'] == 'softmax':
             if last:

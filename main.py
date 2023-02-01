@@ -1,8 +1,8 @@
 """ Transpile a Keras model to a CIRCOM circuit.
 
 Usage:
-    keras2circom.py <model.h5> [-o <output>] [--raw]
-    keras2circom.py (-h | --help)
+    main.py <model.h5> [-o <output>] [--raw]
+    main.py (-h | --help)
 
 Options:
     -h --help                       Show this screen.

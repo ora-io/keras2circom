@@ -16,6 +16,7 @@ class SafeDict(dict):
     def __missing__(self, key):
         return '{' + key + '}'
 
+# template string for circom
 circom_template_string = '''pragma circom 2.0.0;
 
 {include}
@@ -32,13 +33,15 @@ templates: typing.Dict[str, Template] = {
 
 }
 
-def parse_shape(shape: typing.List[int]):
+def parse_shape(shape: typing.List[int]) -> str:
+    '''parse shape to integers enclosed by []'''
     shape_str = ''
     for dim in shape:
         shape_str += '[{}]'.format(dim)
     return shape_str
     
-def parse_index(shape: typing.List[int]):
+def parse_index(shape: typing.List[int]) -> str:
+    '''parse shape to indices enclosed by []'''
     index_str = ''
     for i in range(len(shape)):
         index_str += '[i{}]'.format(i)
@@ -56,7 +59,7 @@ class Template:
     output_names: typing.List[str]  = None
     output_dims: typing.List[int]   = None
 
-    def __str__(self):
+    def __str__(self) -> str:
         args_str = ', '.join(self.args)
         args_str = '(' + args_str + ')'
         return '{:>20}{:30} {}{}{}{} \t<-- {}'.format(
@@ -66,7 +69,7 @@ class Template:
             self.fpath)
 
 def file_parse(fpath):
-    #  print('register circom file: ', fpath)
+    '''parse circom file and register templates'''
     with open(fpath, 'r') as f:
         lines = f.read().split('\n')
 
@@ -101,6 +104,7 @@ def file_parse(fpath):
 
 
 def dir_parse(dir_path, skips=[]):
+    '''parse circom files in a directory'''
     names = os.listdir(dir_path)
     for name in names:
         if name in skips:
@@ -113,20 +117,21 @@ def dir_parse(dir_path, skips=[]):
             if fpath.endswith('.circom'):
                 file_parse(fpath)
 
-# TODO: add back all typings and comments
 @dataclass
 class Signal:
     name: str
     shape: typing.List[int]
     value: typing.Any = None
 
-    def inject_signal(self, comp_name: str):
+    def inject_signal(self, comp_name: str) -> str:
+        '''inject signal into the beginning of the circuit'''
         if self.value is not None:
             return 'signal input {}_{}{};\n'.format(
                     comp_name, self.name, parse_shape(self.shape))
         return ''
     
-    def inject_main(self, comp_name: str, prev_comp_name: str = None, prev_signal: Signal = None):
+    def inject_main(self, comp_name: str, prev_comp_name: str = None, prev_signal: Signal = None) -> str:
+        '''inject signal into main'''
         inject_str = ''
         if self.value is not None:
             for i in range(len(self.shape)):
@@ -160,17 +165,20 @@ class Signal:
         inject_str += '}'*len(self.shape)+'\n'
         return inject_str
     
-    def inject_input_signal(self):
+    def inject_input_signal(self) -> str:
+        '''inject the circuit input signal'''
         if self.value is not None:
             raise ValueError('input signal should not have value')
         return 'signal input in{};\n'.format(parse_shape(self.shape))
     
-    def inject_output_signal(self):
+    def inject_output_signal(self) -> str:
+        '''inject the circuit output signal'''
         if self.value is not None:
             raise ValueError('output signal should not have value')
         return 'signal output out{};\n'.format(parse_shape(self.shape))
     
-    def inject_input_main(self, comp_name: str):
+    def inject_input_main(self, comp_name: str) -> str:
+        '''inject the circuit input signal into main'''
         if self.value is not None:
             raise ValueError('input signal should not have value')
         inject_str = ''
@@ -183,7 +191,8 @@ class Signal:
         inject_str += '}'*len(self.shape)+'\n'
         return inject_str
     
-    def inject_output_main(self, prev_comp_name: str, prev_signal: Signal):
+    def inject_output_main(self, prev_comp_name: str, prev_signal: Signal) -> str:
+        '''inject the circuit output signal into main'''        
         if self.value is not None:
             raise ValueError('output signal should not have value')
         if self.shape != prev_signal.shape:
@@ -220,10 +229,12 @@ class Component:
     weight_scale: float = 1.0
     bias_scale: float = 1.0
 
-    def inject_include(self):
+    def inject_include(self) -> str:
+        '''include the component template'''
         return 'include "../{}";\n'.format(self.template.fpath)
     
-    def inject_signal(self, prev_comp: Component = None, last_comp: bool = False):
+    def inject_signal(self, prev_comp: Component = None, last_comp: bool = False) -> str:
+        '''inject the component signals'''
         inject_str = ''
         for signal in self.inputs:
             if signal.value is None and prev_comp is None:
@@ -235,7 +246,8 @@ class Component:
                 inject_str += signal.inject_output_signal()
         return inject_str
     
-    def inject_component(self):
+    def inject_component(self) -> str:
+        '''inject the component declaration'''
         if self.weight_scale == 1.0 and self.bias_scale == 1.0:
             raise ValueError('initiate weight_scale and bias_scale with Circuit.to_json first')
         if self.template.op_name == 'ReLU':
@@ -267,7 +279,8 @@ class Component:
         return 'component {} = {}({});\n'.format(
             self.name, self.template.op_name, self.parse_args(self.template.args, self.args))
     
-    def inject_main(self, prev_comp: Component = None, last_comp: bool = False):
+    def inject_main(self, prev_comp: Component = None, last_comp: bool = False) -> str:
+        '''inject the component main'''
         inject_str = ''
         for signal in self.inputs:
             if signal.value is not None:
@@ -281,7 +294,8 @@ class Component:
                 inject_str += signal.inject_output_main(self.name, signal)
         return inject_str
 
-    def to_json(self, weight_scale: float, current_scale: float):
+    def to_json(self, weight_scale: float, current_scale: float) -> typing.Dict[str, typing.Any]:
+        '''convert the component params to json format'''
         self.weight_scale = weight_scale
         self.bias_scale = self.calc_bias_scale(weight_scale, current_scale)
         print(self.name, self.weight_scale, self.bias_scale)
@@ -296,7 +310,8 @@ class Component:
                     json_dict.update({f'{self.name}_{signal.name}': list(map('{:.0f}'.format, (signal.value*self.weight_scale).round().flatten().tolist()))})
         return json_dict
     
-    def calc_bias_scale(self, weight_scale: float, current_scale: float):
+    def calc_bias_scale(self, weight_scale: float, current_scale: float) -> float:
+        '''calculate the scale factor of the bias of the component'''
         if self.template.op_name in ['ReLU', 'Flatten2D', 'ArgMax', 'MaxPooling2D', 'GlobalMaxPooling2D']:
             return current_scale
         if self.template.op_name == 'Poly':
@@ -304,7 +319,8 @@ class Component:
         return weight_scale * current_scale
     
     @staticmethod
-    def parse_args(template_args: typing.List[str], args: typing.Dict[str, typing.Any]):
+    def parse_args(template_args: typing.List[str], args: typing.Dict[str, typing.Any]) -> str:
+        '''parse the args to a format string, ready to be injected'''
         args_str = '{'+'}, {'.join(template_args)+'}'
         return args_str.format(**args)
 
@@ -321,31 +337,36 @@ class Circuit:
     def add_components(self, components: typing.List[Component]):
         self.components.extend(components)
 
-    def inject_include(self):
+    def inject_include(self) -> str:
+        '''inject the include statements'''
         inject_str = []
         for component in self.components:
             inject_str.append(component.inject_include())
         return ''.join(set(inject_str))
 
-    def inject_signal(self):
+    def inject_signal(self) -> str:
+        '''inject the signal declarations'''
         inject_str = self.components[0].inject_signal()
         for i in range(1, len(self.components)):
             inject_str += self.components[i].inject_signal(self.components[i-1], i==len(self.components)-1)
         return inject_str
 
-    def inject_component(self):
+    def inject_component(self) -> str:
+        '''inject the component declarations'''
         inject_str = ''
         for component in self.components:
             inject_str += component.inject_component()
         return inject_str
     
-    def inject_main(self):
+    def inject_main(self) -> str:
+        '''inject the main template'''
         inject_str = self.components[0].inject_main()
         for i in range(1, len(self.components)):
             inject_str += self.components[i].inject_main(self.components[i-1], i==len(self.components)-1)
         return inject_str
 
-    def to_circom(self):
+    def to_circom(self) -> str:
+        '''convert the circuit to a circom file'''
         return circom_template_string.format(**{
             'include': self.inject_include(),
             'brace_left': '{',
@@ -355,7 +376,8 @@ class Circuit:
             'brace_right': '}',
         })
 
-    def to_json(self):
+    def to_json(self) -> str:
+        '''convert the model weights to json format'''
         current_scale = 1.0
         weight_scale = self.calculate_scale()
 
@@ -367,7 +389,8 @@ class Circuit:
             print(component.name, current_scale)
         return json.dumps(json_dict)
     
-    def calculate_scale(self):
+    def calculate_scale(self) -> float:
+        '''calculate the scale factor of the model weights'''
         current_scale = 1.0
         weight_scale = 1.0
         while current_scale < 1e+64: # should be able to go up to 1e+75, but just in case
