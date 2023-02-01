@@ -6,18 +6,19 @@ Usage:
 
 Options:
     -h --help                       Show this screen.
-    -o <output> --output=<output>   Output file [default: model.circom].
+    -o <output> --output=<output>   Output directory [default: output].
     --raw                           Output raw model outputs instead of the argmax of outputs [default: False].
 
 """
 from docopt import docopt
 
-from keras2circom import transpiler
+from keras2circom import circom, transpiler
 
 def main():
     """ Main entry point of the app """
     args = docopt(__doc__)
-    print(args)
+    circom.dir_parse('node_modules/circomlib-ml/circuits/', skips=['util.circom', 'circomlib-matrix', 'circomlib', 'crypto'])
+    transpiler.transpile(args['<model.h5>'], args['--output'], args['--raw'])
 
 if __name__ == "__main__":
     """ This is executed when run from the command line """

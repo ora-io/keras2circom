@@ -17,6 +17,7 @@
   },
   "homepage": "https://github.com/socathie/keras2circom#readme",
   "devDependencies": {
+    "await-exec": "^0.1.2",
     "chai": "^4.3.7",
     "circom_tester": "^0.0.19",
     "circomlib-ml": "^1.4.4",

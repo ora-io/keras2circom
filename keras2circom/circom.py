@@ -113,7 +113,7 @@ def dir_parse(dir_path, skips=[]):
             if fpath.endswith('.circom'):
                 file_parse(fpath)
 
-# TODO: review Signal, Component, Circuit
+# TODO: add back all typings and comments
 @dataclass
 class Signal:
     name: str
@@ -132,9 +132,10 @@ class Signal:
             for i in range(len(self.shape)):
                 inject_str += '{}for (var i{} = 0; i{} < {}; i{}++) {{\n'.format(
                             ' '*i*4, i, i, self.shape[i], i)
-            inject_str += '{}{}.{}{} <== {}_{}{};\n\n'.format(' '*(i+1)*4,
+            inject_str += '{}{}.{}{} <== {}_{}{};\n'.format(' '*(i+1)*4,
                         comp_name, self.name, parse_index(self.shape),
                         comp_name, self.name, parse_index(self.shape))
+            inject_str += '}'*len(self.shape)+'\n'
             return inject_str
         
         if self.shape != prev_signal.shape:
@@ -144,18 +145,19 @@ class Signal:
             inject_str += '{}for (var i{} = 0; i{} < {}; i{}++) {{\n'.format(
                             ' '*i*4, i, i, self.shape[i], i)
         
-        if 're_lu' in comp_name or 'lambda' in comp_name or 'softmax' in comp_name:
-            inject_str += '{}{}{}.{} <== {}.{}{};\n\n'.format(' '*(i+1)*4,
+        if 're_lu' in comp_name or 'lambda' in comp_name:
+            inject_str += '{}{}{}.{} <== {}.{}{};\n'.format(' '*(i+1)*4,
                         comp_name, parse_index(self.shape), self.name,
                         prev_comp_name, prev_signal.name, parse_index(self.shape))
         elif 're_lu' in prev_comp_name or 'lambda' in prev_comp_name:
-            inject_str += '{}{}.{}{} <== {}{}.{};\n\n'.format(' '*(i+1)*4,
+            inject_str += '{}{}.{}{} <== {}{}.{};\n'.format(' '*(i+1)*4,
                         comp_name, self.name, parse_index(self.shape),
                         prev_comp_name, parse_index(self.shape), prev_signal.name)
         else:
-            inject_str += '{}{}.{}{} <== {}.{}{};\n\n'.format(' '*(i+1)*4,
+            inject_str += '{}{}.{}{} <== {}.{}{};\n'.format(' '*(i+1)*4,
                         comp_name, self.name, parse_index(self.shape),
                         prev_comp_name, prev_signal.name, parse_index(self.shape))
+        inject_str += '}'*len(self.shape)+'\n'
         return inject_str
     
     def inject_input_signal(self):
@@ -175,9 +177,10 @@ class Signal:
         for i in range(len(self.shape)):
             inject_str += '{}for (var i{} = 0; i{} < {}; i{}++) {{\n'.format(
                         ' '*i*4, i, i, self.shape[i], i)
-        inject_str += '{}{}.{}{} <== in{};\n\n'.format(' '*(i+1)*4,
+        inject_str += '{}{}.{}{} <== in{};\n'.format(' '*(i+1)*4,
                     comp_name, self.name, parse_index(self.shape),
                     parse_index(self.shape))
+        inject_str += '}'*len(self.shape)+'\n'
         return inject_str
     
     def inject_output_main(self, prev_comp_name: str, prev_signal: Signal):
@@ -185,19 +188,25 @@ class Signal:
             raise ValueError('output signal should not have value')
         if self.shape != prev_signal.shape:
             raise ValueError('shape mismatch: {} vs. {}'.format(self.shape, prev_signal.shape))
+        
+        if 'softmax' in prev_comp_name:
+            return 'out[0] <== {}.out;\n'.format(prev_comp_name)
+        
         inject_str = ''
+
         for i in range(len(self.shape)):
             inject_str += '{}for (var i{} = 0; i{} < {}; i{}++) {{\n'.format(
                         ' '*i*4, i, i, self.shape[i], i)
         
         if 're_lu' in prev_comp_name or 'lambda' in prev_comp_name:
-            inject_str += '{}out{} <== {}{}.{};\n\n'.format(' '*(i+1)*4,
+            inject_str += '{}out{} <== {}{}.{};\n'.format(' '*(i+1)*4,
                         parse_index(self.shape),
                         prev_comp_name, parse_index(self.shape), prev_signal.name)
         else:
-            inject_str += '{}out{} <== {}.{}{};\n\n'.format(' '*(i+1)*4,
+            inject_str += '{}out{} <== {}.{}{};\n'.format(' '*(i+1)*4,
                         parse_index(self.shape),
                         prev_comp_name, prev_signal.name, parse_index(self.shape))
+        inject_str += '}'*len(self.shape)+'\n'
         return inject_str
 
 @dataclass
@@ -208,9 +217,11 @@ class Component:
     outputs: typing.List[Signal]
     # optional args
     args: typing.Dict[str, typing.Any] = None
+    weight_scale: float = 1.0
+    bias_scale: float = 1.0
 
     def inject_include(self):
-        return 'include "{}";\n'.format(self.template.fpath)
+        return 'include "../{}";\n'.format(self.template.fpath)
     
     def inject_signal(self, prev_comp: Component = None, last_comp: bool = False):
         inject_str = ''
@@ -225,18 +236,33 @@ class Component:
         return inject_str
     
     def inject_component(self):
+        if self.weight_scale == 1.0 and self.bias_scale == 1.0:
+            raise ValueError('initiate weight_scale and bias_scale with Circuit.to_json first')
         if self.template.op_name == 'ReLU':
             inject_str = 'component {}{};\n'.format(self.name, parse_shape(self.outputs[0].shape))
             for i in range(len(self.outputs[0].shape)):
                 inject_str += '{}for (var i{} = 0; i{} < {}; i{}++) {{\n'.format(
                             ' '*i*4, i, i, self.outputs[0].shape[i], i)
-            inject_str += '{}{}{} <== ReLU();\n\n'.format(' '*(i+1)*4,
+            inject_str += '{}{}{} = ReLU();\n'.format(' '*(i+1)*4,
                         self.name, parse_index(self.outputs[0].shape))
+            inject_str += '}'*len(self.outputs[0].shape)+'\n'
             return inject_str
         
-        # TODO: need to handle scaling with Poly
         if self.template.op_name == 'Poly':
-            return ''
+            inject_str = 'component {}{};\n'.format(self.name, parse_shape(self.outputs[0].shape))
+            for i in range(len(self.outputs[0].shape)):
+                inject_str += '{}for (var i{} = 0; i{} < {}; i{}++) {{\n'.format(
+                            ' '*i*4, i, i, self.outputs[0].shape[i], i)
+            inject_str += '{}{}{} = Poly({});\n'.format(' '*(i+1)*4,
+                        self.name, parse_index(self.outputs[0].shape), int(self.weight_scale))
+            inject_str += '}'*len(self.outputs[0].shape)+'\n'
+            return inject_str
+        
+        if 'scaledInvPoolSize' in self.template.args:
+            self.args['scaledInvPoolSize'] = max(1.0, round(self.args['scaledInvPoolSize']*self.weight_scale))
+        
+        if 'scaledInv' in self.template.args:
+            self.args['scaledInv'] = max(1.0, round(self.args['scaledInv']*self.weight_scale))
 
         return 'component {} = {}({});\n'.format(
             self.name, self.template.op_name, self.parse_args(self.template.args, self.args))
@@ -255,10 +281,27 @@ class Component:
                 inject_str += signal.inject_output_main(self.name, signal)
         return inject_str
 
-    def to_json(self):
-        return {}
+    def to_json(self, weight_scale: float, current_scale: float):
+        self.weight_scale = weight_scale
+        self.bias_scale = self.calc_bias_scale(weight_scale, current_scale)
+        print(self.name, self.weight_scale, self.bias_scale)
+
+        json_dict = {}
+        for signal in self.inputs:
+            if signal.value is not None:
+                if signal.name == 'bias' or signal.name == 'b':
+                    print(signal.value)
+                    json_dict.update({f'{self.name}_{signal.name}': list(map('{:.0f}'.format, (signal.value*self.bias_scale).round().flatten().tolist()))})
+                else:
+                    json_dict.update({f'{self.name}_{signal.name}': list(map('{:.0f}'.format, (signal.value*self.weight_scale).round().flatten().tolist()))})
+        return json_dict
     
-    # def calc_bias_scale(self, weightScale)
+    def calc_bias_scale(self, weight_scale: float, current_scale: float):
+        if self.template.op_name in ['ReLU', 'Flatten2D', 'ArgMax', 'MaxPooling2D', 'GlobalMaxPooling2D']:
+            return current_scale
+        if self.template.op_name == 'Poly':
+            return current_scale * current_scale
+        return weight_scale * current_scale
     
     @staticmethod
     def parse_args(template_args: typing.List[str], args: typing.Dict[str, typing.Any]):
@@ -301,7 +344,6 @@ class Circuit:
         for i in range(1, len(self.components)):
             inject_str += self.components[i].inject_main(self.components[i-1], i==len(self.components)-1)
         return inject_str
-        
 
     def to_circom(self):
         return circom_template_string.format(**{
@@ -314,5 +356,25 @@ class Circuit:
         })
 
     def to_json(self):
+        current_scale = 1.0
+        weight_scale = self.calculate_scale()
+
         json_dict = {}
-        return json.dumps(json_dict, indent=4)
+
+        for component in self.components:
+            json_dict.update(component.to_json(weight_scale, current_scale))
+            current_scale = component.calc_bias_scale(weight_scale, current_scale)
+            print(component.name, current_scale)
+        return json.dumps(json_dict)
+    
+    def calculate_scale(self):
+        current_scale = 1.0
+        weight_scale = 1.0
+        while current_scale < 1e+64: # should be able to go up to 1e+75, but just in case
+            current_scale = 1.0
+            weight_scale *= 10
+            for component in self.components:
+                current_scale = component.calc_bias_scale(weight_scale, current_scale)
+        if weight_scale == 10.0:
+            raise Exception('Model too large to be converted to circom')
+        return weight_scale/10

@@ -1,10 +1,13 @@
 from .circom import *
 from .model import *
 
+import os
+
 from difflib import SequenceMatcher
 poly_activation = '4wEAAAAAAAAAAAAAAAEAAAACAAAAQwAAAHMMAAAAfABkARMAfAAXAFMAKQJO6QIAAACpACkB2gF4\ncgIAAAByAgAAAHpOL3Zhci9mb2xkZXJzL2d0L3NnM3Y4cmQxM2w1Mmp4OTFtZmJnemJmYzAwMDBn\nbi9UL2lweWtlcm5lbF8xNTU3MS8yMTc2NzAzOTE5LnB52gg8bGFtYmRhPggAAADzAAAAAA==\n'
 
-def transpile(filename: str, output: str = 'output.circom', raw: bool = False) -> Circuit:
+def transpile(filename: str, output_dir: str = 'output', raw: bool = False) -> Circuit:
+    
     model = Model(filename, raw)
 
     circuit = Circuit()
@@ -14,10 +17,18 @@ def transpile(filename: str, output: str = 'output.circom', raw: bool = False) -
     circuit.add_components(transpile_layer(model.layers[-1], True))
 
     if raw:
-        if circuit.components[-1].template == 'ArgMax':
+        if circuit.components[-1].template.op_name == 'ArgMax':
             circuit.components.pop()
-            
-    # TODO: save to file
+    # create output directory if it doesn't exist
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+    
+    with open(output_dir + '/circuit.json', 'w') as f:
+        f.write(circuit.to_json())
+    
+    with open(output_dir + '/circuit.circom', 'w') as f:
+        f.write(circuit.to_circom())
+    
     return circuit
 
 def transpile_layer(layer: Layer, last: bool = False) -> typing.List[Component]:
