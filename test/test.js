@@ -18,38 +18,38 @@ const alt_model = require('../models/alt_model.json');
 describe('keras2circom test', function () {
     this.timeout(100000000);
 
-    describe('models/best_model.h5', async () => {
-        // it('softmax output', async () => {
-        //     await exec('python main.py models/best_practice.h5 -o best_practice');
+    describe('models/best_practice.h5', async () => {
+        it('softmax output', async () => {
+            await exec('python main.py models/best_practice.h5 -o best_practice');
 
-        //     const json = JSON.parse(fs.readFileSync('./best_practice/circuit.json'));
+            const json = JSON.parse(fs.readFileSync('./best_practice/circuit.json'));
 
-        //     let INPUT = {};
+            let INPUT = {};
             
-        //     for (const [key, value] of Object.entries(json)) {
-        //         if (Array.isArray(value)) {
-        //             let tmpArray = [];
-        //             for (let i = 0; i < value.flat().length; i++) {
-        //                 tmpArray.push(Fr.e(value.flat()[i]));
-        //             }
-        //             INPUT[key] = tmpArray;
-        //         } else {
-        //             INPUT[key] = Fr.e(value);
-        //         }
-        //     }
-        //     let tmpArray = [];
-        //     for (let i=0; i < best_practice['X'].length; i++) {
-        //         tmpArray.push(Fr.e(best_practice['X'][i]));
-        //     }
-        //     INPUT['in'] = tmpArray;
+            for (const [key, value] of Object.entries(json)) {
+                if (Array.isArray(value)) {
+                    let tmpArray = [];
+                    for (let i = 0; i < value.flat().length; i++) {
+                        tmpArray.push(Fr.e(value.flat()[i]));
+                    }
+                    INPUT[key] = tmpArray;
+                } else {
+                    INPUT[key] = Fr.e(value);
+                }
+            }
+            let tmpArray = [];
+            for (let i=0; i < best_practice['X'].length; i++) {
+                tmpArray.push(Fr.e(best_practice['X'][i]));
+            }
+            INPUT['in'] = tmpArray;
 
-        //     const circuit = await wasm_tester('./best_practice/circuit.circom');
+            const circuit = await wasm_tester('./best_practice/circuit.circom');
 
-        //     const witness = await circuit.calculateWitness(INPUT, true);
+            const witness = await circuit.calculateWitness(INPUT, true);
 
-        //     assert(Fr.eq(Fr.e(witness[0]),Fr.e(1)));
-        //     assert(Fr.eq(Fr.e(witness[1]),Fr.e(7)));
-        // });
+            assert(Fr.eq(Fr.e(witness[0]),Fr.e(1)));
+            assert(Fr.eq(Fr.e(witness[1]),Fr.e(7)));
+        });
 
         it('raw output', async () => {
             await exec('python main.py models/best_practice.h5 -o best_practice_raw --raw');
@@ -82,6 +82,88 @@ describe('keras2circom test', function () {
             assert(Fr.eq(Fr.e(witness[0]),Fr.e(1)));
 
             console.log(best_practice['y']);
+            console.log(witness.slice(1, 11));
+
+
+
+            // let ape = 0;
+
+            // for (var i=0; i<OUTPUT.out.length; i++) {
+            //     console.log('actual', OUTPUT.out[i], 'predicted', Fr.toString(witness[i+2])*OUTPUT.scale);
+            //     ape += Math.abs((OUTPUT.out[i]-parseInt(Fr.toString(witness[i+2]))*OUTPUT.scale)/OUTPUT.out[i]);
+            // }
+
+            // const mape = ape/OUTPUT.out.length;
+
+            // console.log('mean absolute % error', mape);
+
+        });
+    });
+
+    describe('models/alt_model.h5', async () => {
+        it('softmax output', async () => {
+            await exec('python main.py models/alt_model.h5 -o alt_model');
+
+            const json = JSON.parse(fs.readFileSync('./alt_model/circuit.json'));
+
+            let INPUT = {};
+            
+            for (const [key, value] of Object.entries(json)) {
+                if (Array.isArray(value)) {
+                    let tmpArray = [];
+                    for (let i = 0; i < value.flat().length; i++) {
+                        tmpArray.push(Fr.e(value.flat()[i]));
+                    }
+                    INPUT[key] = tmpArray;
+                } else {
+                    INPUT[key] = Fr.e(value);
+                }
+            }
+            let tmpArray = [];
+            for (let i=0; i < alt_model['X'].length; i++) {
+                tmpArray.push(Fr.e(alt_model['X'][i]));
+            }
+            INPUT['in'] = tmpArray;
+
+            const circuit = await wasm_tester('./alt_model/circuit.circom');
+
+            const witness = await circuit.calculateWitness(INPUT, true);
+
+            assert(Fr.eq(Fr.e(witness[0]),Fr.e(1)));
+            assert(Fr.eq(Fr.e(witness[1]),Fr.e(7)));
+        });
+
+        it('raw output', async () => {
+            await exec('python main.py models/alt_model.h5 -o alt_model_raw --raw');
+
+            const json = JSON.parse(fs.readFileSync('./alt_model_raw/circuit.json'));
+
+            let INPUT = {};
+            
+            for (const [key, value] of Object.entries(json)) {
+                if (Array.isArray(value)) {
+                    let tmpArray = [];
+                    for (let i = 0; i < value.flat().length; i++) {
+                        tmpArray.push(Fr.e(value.flat()[i]));
+                    }
+                    INPUT[key] = tmpArray;
+                } else {
+                    INPUT[key] = Fr.e(value);
+                }
+            }
+            let tmpArray = [];
+            for (let i=0; i < alt_model['X'].length; i++) {
+                tmpArray.push(Fr.e(alt_model['X'][i]));
+            }
+            INPUT['in'] = tmpArray;
+
+            const circuit = await wasm_tester('./alt_model_raw/circuit.circom');
+            
+            const witness = await circuit.calculateWitness(INPUT, true);
+            
+            assert(Fr.eq(Fr.e(witness[0]),Fr.e(1)));
+
+            console.log(alt_model['y']);
             console.log(witness.slice(1, 11));
 
 

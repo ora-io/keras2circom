@@ -85,7 +85,7 @@ def transpile_layer(layer: Layer, last: bool = False) -> typing.List[Component]:
 
 # TODO: handle scaling
 def transpile_ArgMax(layer: Layer) -> typing.List[Component]:
-    return [Component(layer.name, templates['ArgMax'], [Signal('in', layer.output)], [Signal('out', (1,))], {'n': layer.input[0]})]
+    return [Component(layer.name, templates['ArgMax'], [Signal('in', layer.output)], [Signal('out', (1,))], {'n': layer.output[0]})]
 
 def transpile_ReLU(layer: Layer) -> typing.List[Component]:
     return [Component(layer.name, templates['ReLU'], [Signal('in', layer.output)], [Signal('out', layer.output)])]
@@ -200,7 +200,7 @@ def transpile_Dense(layer: Layer, last: bool = False) -> typing.List[Component]:
         return [dense, activation]
     
     if layer.config['activation'] == 'softmax':
-        activation = Component(layer.name+'_softmax', templates['ArgMax'], [Signal('in', layer.output)], [Signal('out', (1,))], {'n': layer.input[0]})
+        activation = Component(layer.name+'_softmax', templates['ArgMax'], [Signal('in', layer.output)], [Signal('out', (1,))], {'n': layer.output[0]})
         return [dense, activation]
     
     return [dense]

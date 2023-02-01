@@ -145,11 +145,11 @@ class Signal:
             inject_str += '{}for (var i{} = 0; i{} < {}; i{}++) {{\n'.format(
                             ' '*i*4, i, i, self.shape[i], i)
         
-        if 're_lu' in comp_name or 'lambda' in comp_name:
+        if 'activation' in comp_name or 're_lu' in comp_name or 'lambda' in comp_name:
             inject_str += '{}{}{}.{} <== {}.{}{};\n'.format(' '*(i+1)*4,
                         comp_name, parse_index(self.shape), self.name,
                         prev_comp_name, prev_signal.name, parse_index(self.shape))
-        elif 're_lu' in prev_comp_name or 'lambda' in prev_comp_name:
+        elif 'activation' in prev_comp_name or 're_lu' in prev_comp_name or 'lambda' in prev_comp_name:
             inject_str += '{}{}.{}{} <== {}{}.{};\n'.format(' '*(i+1)*4,
                         comp_name, self.name, parse_index(self.shape),
                         prev_comp_name, parse_index(self.shape), prev_signal.name)
