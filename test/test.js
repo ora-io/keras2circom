@@ -15,6 +15,12 @@ const exec = require('await-exec');
 const best_practice = require('../models/best_practice.json');
 const alt_model = require('../models/alt_model.json');
 
+function softmax(arr) {
+    return arr.map(function(value,index) { 
+      return Math.exp(value) / arr.map( function(y /*value*/){ return Math.exp(y) } ).reduce( function(a,b){ return a+b })
+    })
+}
+
 describe('keras2circom test', function () {
     this.timeout(100000000);
 
@@ -81,22 +87,24 @@ describe('keras2circom test', function () {
             
             assert(Fr.eq(Fr.e(witness[0]),Fr.e(1)));
 
-            console.log(best_practice['y']);
-            console.log(witness.slice(1, 11));
+            const scale = 1E-51;
 
+            let predicted = [];
+            for (var i=0; i<best_practice['y'].length; i++) {
+                predicted.push(parseFloat(Fr.toString(Fr.e(witness[i+1]))) * scale);
+            }
 
+            let ape = 0;
 
-            // let ape = 0;
+            for (var i=0; i<best_practice['y'].length; i++) {
+                const actual = best_practice['y'][i];
+                console.log('actual', actual, 'predicted', predicted[i]);
+                ape += Math.abs((predicted[i]-actual)/actual);
+            }
 
-            // for (var i=0; i<OUTPUT.out.length; i++) {
-            //     console.log('actual', OUTPUT.out[i], 'predicted', Fr.toString(witness[i+2])*OUTPUT.scale);
-            //     ape += Math.abs((OUTPUT.out[i]-parseInt(Fr.toString(witness[i+2]))*OUTPUT.scale)/OUTPUT.out[i]);
-            // }
+            const mape = ape/best_practice['y'].length;
 
-            // const mape = ape/OUTPUT.out.length;
-
-            // console.log('mean absolute % error', mape);
-
+            console.log('mean absolute % error', mape);
         });
     });
 
@@ -163,22 +171,26 @@ describe('keras2circom test', function () {
             
             assert(Fr.eq(Fr.e(witness[0]),Fr.e(1)));
 
-            console.log(alt_model['y']);
-            console.log(witness.slice(1, 11));
+            const scale = 1E-60;
 
+            let predicted_raw = [];
+            for (var i=0; i<alt_model['y'].length; i++) {
+                predicted_raw.push(parseFloat(Fr.toString(Fr.e(witness[i+1]))) * scale);
+            }
 
+            const predicted = softmax(predicted_raw);
 
-            // let ape = 0;
+            let ape = 0;
 
-            // for (var i=0; i<OUTPUT.out.length; i++) {
-            //     console.log('actual', OUTPUT.out[i], 'predicted', Fr.toString(witness[i+2])*OUTPUT.scale);
-            //     ape += Math.abs((OUTPUT.out[i]-parseInt(Fr.toString(witness[i+2]))*OUTPUT.scale)/OUTPUT.out[i]);
-            // }
+            for (var i=0; i<alt_model['y'].length; i++) {
+                const actual = alt_model['y'][i]
+                console.log('actual', actual, 'predicted', predicted[i]);
+                ape += Math.abs((predicted[i]-actual)/actual);
+            }
 
-            // const mape = ape/OUTPUT.out.length;
+            const mape = ape/alt_model['y'].length;
 
-            // console.log('mean absolute % error', mape);
-
+            console.log('mean absolute % error', mape);
         });
     });
 });

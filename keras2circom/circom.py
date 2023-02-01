@@ -265,8 +265,8 @@ class Component:
             for i in range(len(self.outputs[0].shape)):
                 inject_str += '{}for (var i{} = 0; i{} < {}; i{}++) {{\n'.format(
                             ' '*i*4, i, i, self.outputs[0].shape[i], i)
-            inject_str += '{}{}{} = Poly({});\n'.format(' '*(i+1)*4,
-                        self.name, parse_index(self.outputs[0].shape), int(self.weight_scale))
+            inject_str += '{}{}{} = Poly({:.0f});\n'.format(' '*(i+1)*4,
+                        self.name, parse_index(self.outputs[0].shape), round(self.bias_scale**.5))
             inject_str += '}'*len(self.outputs[0].shape)+'\n'
             return inject_str
         
@@ -298,13 +298,13 @@ class Component:
         '''convert the component params to json format'''
         self.weight_scale = weight_scale
         self.bias_scale = self.calc_bias_scale(weight_scale, current_scale)
-        print(self.name, self.weight_scale, self.bias_scale)
+        # print(self.name, current_scale, self.weight_scale, self.bias_scale)
 
         json_dict = {}
         for signal in self.inputs:
             if signal.value is not None:
                 if signal.name == 'bias' or signal.name == 'b':
-                    print(signal.value)
+                    # print(signal.value)
                     json_dict.update({f'{self.name}_{signal.name}': list(map('{:.0f}'.format, (signal.value*self.bias_scale).round().flatten().tolist()))})
                 else:
                     json_dict.update({f'{self.name}_{signal.name}': list(map('{:.0f}'.format, (signal.value*self.weight_scale).round().flatten().tolist()))})
@@ -386,7 +386,7 @@ class Circuit:
         for component in self.components:
             json_dict.update(component.to_json(weight_scale, current_scale))
             current_scale = component.calc_bias_scale(weight_scale, current_scale)
-            print(component.name, current_scale)
+            # print(component.name, current_scale)
         return json.dumps(json_dict)
     
     def calculate_scale(self) -> float:
