@@ -19,7 +19,7 @@
   "devDependencies": {
     "chai": "^4.3.7",
     "circom_tester": "^0.0.19",
-    "circomlib-ml": "^1.4.5",
+    "circomlib-ml": "^1.4.4",
     "mocha": "^10.2.0"
   }
 }
