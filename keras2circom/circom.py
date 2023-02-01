@@ -120,42 +120,42 @@ class Signal:
     shape: typing.List[int]
     value: typing.Any = None
 
-    def inject_signal(self, compName: str):
+    def inject_signal(self, comp_name: str):
         if self.value is not None:
             return 'signal input {}_{}{};\n'.format(
-                    compName, self.name, parse_shape(self.shape))
+                    comp_name, self.name, parse_shape(self.shape))
         return ''
     
-    def inject_main(self, compName: str, prevCompName: str = None, prevSignal: Signal = None):
+    def inject_main(self, comp_name: str, prev_comp_name: str = None, prev_signal: Signal = None):
         inject_str = ''
         if self.value is not None:
             for i in range(len(self.shape)):
                 inject_str += '{}for (var i{} = 0; i{} < {}; i{}++) {{\n'.format(
                             ' '*i*4, i, i, self.shape[i], i)
             inject_str += '{}{}.{}{} <== {}_{}{};\n\n'.format(' '*(i+1)*4,
-                        compName, self.name, parse_index(self.shape),
-                        compName, self.name, parse_index(self.shape))
+                        comp_name, self.name, parse_index(self.shape),
+                        comp_name, self.name, parse_index(self.shape))
             return inject_str
         
-        if self.shape != prevSignal.shape:
-            raise ValueError('shape mismatch: {} vs. {}'.format(self.shape, prevSignal.shape))
+        if self.shape != prev_signal.shape:
+            raise ValueError('shape mismatch: {} vs. {}'.format(self.shape, prev_signal.shape))
             
         for i in range(len(self.shape)):
             inject_str += '{}for (var i{} = 0; i{} < {}; i{}++) {{\n'.format(
                             ' '*i*4, i, i, self.shape[i], i)
         
-        if 're_lu' in compName or 'lambda' in compName or 'softmax' in compName:
+        if 're_lu' in comp_name or 'lambda' in comp_name or 'softmax' in comp_name:
             inject_str += '{}{}{}.{} <== {}.{}{};\n\n'.format(' '*(i+1)*4,
-                        compName, parse_index(self.shape), self.name,
-                        prevCompName, prevSignal.name, parse_index(self.shape))
-        elif 're_lu' in prevCompName or 'lambda' in prevCompName:
+                        comp_name, parse_index(self.shape), self.name,
+                        prev_comp_name, prev_signal.name, parse_index(self.shape))
+        elif 're_lu' in prev_comp_name or 'lambda' in prev_comp_name:
             inject_str += '{}{}.{}{} <== {}{}.{};\n\n'.format(' '*(i+1)*4,
-                        compName, self.name, parse_index(self.shape),
-                        prevCompName, parse_index(self.shape), prevSignal.name)
+                        comp_name, self.name, parse_index(self.shape),
+                        prev_comp_name, parse_index(self.shape), prev_signal.name)
         else:
             inject_str += '{}{}.{}{} <== {}.{}{};\n\n'.format(' '*(i+1)*4,
-                        compName, self.name, parse_index(self.shape),
-                        prevCompName, prevSignal.name, parse_index(self.shape))
+                        comp_name, self.name, parse_index(self.shape),
+                        prev_comp_name, prev_signal.name, parse_index(self.shape))
         return inject_str
     
     def inject_input_signal(self):
@@ -168,7 +168,7 @@ class Signal:
             raise ValueError('output signal should not have value')
         return 'signal output out{};\n'.format(parse_shape(self.shape))
     
-    def inject_input_main(self, compName: str):
+    def inject_input_main(self, comp_name: str):
         if self.value is not None:
             raise ValueError('input signal should not have value')
         inject_str = ''
@@ -176,31 +176,29 @@ class Signal:
             inject_str += '{}for (var i{} = 0; i{} < {}; i{}++) {{\n'.format(
                         ' '*i*4, i, i, self.shape[i], i)
         inject_str += '{}{}.{}{} <== in{};\n\n'.format(' '*(i+1)*4,
-                    compName, self.name, parse_index(self.shape),
+                    comp_name, self.name, parse_index(self.shape),
                     parse_index(self.shape))
         return inject_str
     
-    def inject_output_main(self, prevCompName: str, prevSignal: Signal):
+    def inject_output_main(self, prev_comp_name: str, prev_signal: Signal):
         if self.value is not None:
             raise ValueError('output signal should not have value')
-        if self.shape != prevSignal.shape:
-            raise ValueError('shape mismatch: {} vs. {}'.format(self.shape, prevSignal.shape))
+        if self.shape != prev_signal.shape:
+            raise ValueError('shape mismatch: {} vs. {}'.format(self.shape, prev_signal.shape))
         inject_str = ''
         for i in range(len(self.shape)):
             inject_str += '{}for (var i{} = 0; i{} < {}; i{}++) {{\n'.format(
                         ' '*i*4, i, i, self.shape[i], i)
         
-        if 're_lu' in prevCompName or 'lambda' in prevCompName:
+        if 're_lu' in prev_comp_name or 'lambda' in prev_comp_name:
             inject_str += '{}out{} <== {}{}.{};\n\n'.format(' '*(i+1)*4,
                         parse_index(self.shape),
-                        prevCompName, parse_index(self.shape), prevSignal.name)
+                        prev_comp_name, parse_index(self.shape), prev_signal.name)
         else:
             inject_str += '{}out{} <== {}.{}{};\n\n'.format(' '*(i+1)*4,
                         parse_index(self.shape),
-                        prevCompName, prevSignal.name, parse_index(self.shape))
+                        prev_comp_name, prev_signal.name, parse_index(self.shape))
         return inject_str
-    
-
 
 @dataclass
 class Component:
@@ -214,15 +212,15 @@ class Component:
     def inject_include(self):
         return 'include "{}";\n'.format(self.template.fpath)
     
-    def inject_signal(self, prevComponent: Component = None, lastComponent: bool = False):
+    def inject_signal(self, prev_comp: Component = None, last_comp: bool = False):
         inject_str = ''
         for signal in self.inputs:
-            if signal.value is None and prevComponent is None:
+            if signal.value is None and prev_comp is None:
                 inject_str += signal.inject_input_signal()
             elif signal.value is not None:
                 inject_str += signal.inject_signal(self.name)
         for signal in self.outputs:
-            if signal.value is None and lastComponent is True:
+            if signal.value is None and last_comp is True:
                 inject_str += signal.inject_output_signal()
         return inject_str
     
@@ -243,19 +241,24 @@ class Component:
         return 'component {} = {}({});\n'.format(
             self.name, self.template.op_name, self.parse_args(self.template.args, self.args))
     
-    def inject_main(self, prevComponent: Component = None, lastComponent: bool = False):
+    def inject_main(self, prev_comp: Component = None, last_comp: bool = False):
         inject_str = ''
         for signal in self.inputs:
             if signal.value is not None:
                 inject_str += signal.inject_main(self.name)
-            elif prevComponent is None:
+            elif prev_comp is None:
                 inject_str += signal.inject_input_main(self.name)
             else:
-                inject_str += signal.inject_main(self.name, prevComponent.name, prevComponent.outputs[0])
-        if lastComponent:
+                inject_str += signal.inject_main(self.name, prev_comp.name, prev_comp.outputs[0])
+        if last_comp:
             for signal in self.outputs:
                 inject_str += signal.inject_output_main(self.name, signal)
         return inject_str
+
+    def to_json(self):
+        return {}
+    
+    # def calc_bias_scale(self, weightScale)
     
     @staticmethod
     def parse_args(template_args: typing.List[str], args: typing.Dict[str, typing.Any]):
@@ -309,3 +312,7 @@ class Circuit:
             'main': self.inject_main(),
             'brace_right': '}',
         })
+
+    def to_json(self):
+        json_dict = {}
+        return json.dumps(json_dict, indent=4)
