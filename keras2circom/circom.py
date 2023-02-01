@@ -132,7 +132,7 @@ class Signal:
             for i in range(len(self.shape)):
                 inject_str += '{}for (var i{} = 0; i{} < {}; i{}++) {{\n'.format(
                             ' '*i*4, i, i, self.shape[i], i)
-            inject_str += '{}{}.{}{} <== {}_{}{};\n'.format(' '*(i+1)*4,
+            inject_str += '{}{}.{}{} <== {}_{}{};\n\n'.format(' '*(i+1)*4,
                         compName, self.name, parse_index(self.shape),
                         compName, self.name, parse_index(self.shape))
             return inject_str
@@ -144,17 +144,16 @@ class Signal:
             inject_str += '{}for (var i{} = 0; i{} < {}; i{}++) {{\n'.format(
                             ' '*i*4, i, i, self.shape[i], i)
         
-        # TODO: fix this
         if 're_lu' in compName or 'lambda' in compName or 'softmax' in compName:
-            inject_str += '{}{}{}.{} <== {}.{}{};\n'.format(' '*(i+1)*4,
+            inject_str += '{}{}{}.{} <== {}.{}{};\n\n'.format(' '*(i+1)*4,
                         compName, parse_index(self.shape), self.name,
                         prevCompName, prevSignal.name, parse_index(self.shape))
-        elif 're_lu' in prevCompName or 'lambda' in prevCompName or 'softmax' in prevCompName:
-            inject_str += '{}{}.{}{} <== {}{}.{};\n'.format(' '*(i+1)*4,
+        elif 're_lu' in prevCompName or 'lambda' in prevCompName:
+            inject_str += '{}{}.{}{} <== {}{}.{};\n\n'.format(' '*(i+1)*4,
                         compName, self.name, parse_index(self.shape),
                         prevCompName, parse_index(self.shape), prevSignal.name)
         else:
-            inject_str += '{}{}.{}{} <== {}.{}{};\n'.format(' '*(i+1)*4,
+            inject_str += '{}{}.{}{} <== {}.{}{};\n\n'.format(' '*(i+1)*4,
                         compName, self.name, parse_index(self.shape),
                         prevCompName, prevSignal.name, parse_index(self.shape))
         return inject_str
@@ -176,7 +175,7 @@ class Signal:
         for i in range(len(self.shape)):
             inject_str += '{}for (var i{} = 0; i{} < {}; i{}++) {{\n'.format(
                         ' '*i*4, i, i, self.shape[i], i)
-        inject_str += '{}{}.{}{} <== in{};\n'.format(' '*(i+1)*4,
+        inject_str += '{}{}.{}{} <== in{};\n\n'.format(' '*(i+1)*4,
                     compName, self.name, parse_index(self.shape),
                     parse_index(self.shape))
         return inject_str
@@ -190,12 +189,16 @@ class Signal:
         for i in range(len(self.shape)):
             inject_str += '{}for (var i{} = 0; i{} < {}; i{}++) {{\n'.format(
                         ' '*i*4, i, i, self.shape[i], i)
-        inject_str += '{}out{} <== {}.{}{};\n'.format(' '*(i+1)*4,
-                    parse_index(self.shape),
-                    prevCompName, prevSignal.name, parse_index(self.shape))
+        
+        if 're_lu' in prevCompName or 'lambda' in prevCompName:
+            inject_str += '{}out{} <== {}{}.{};\n\n'.format(' '*(i+1)*4,
+                        parse_index(self.shape),
+                        prevCompName, parse_index(self.shape), prevSignal.name)
+        else:
+            inject_str += '{}out{} <== {}.{}{};\n\n'.format(' '*(i+1)*4,
+                        parse_index(self.shape),
+                        prevCompName, prevSignal.name, parse_index(self.shape))
         return inject_str
-
-    # TODO: special handling for activations
     
 
 
@@ -229,7 +232,7 @@ class Component:
             for i in range(len(self.outputs[0].shape)):
                 inject_str += '{}for (var i{} = 0; i{} < {}; i{}++) {{\n'.format(
                             ' '*i*4, i, i, self.outputs[0].shape[i], i)
-            inject_str += '{}{}{} <== ReLU();\n'.format(' '*(i+1)*4,
+            inject_str += '{}{}{} <== ReLU();\n\n'.format(' '*(i+1)*4,
                         self.name, parse_index(self.outputs[0].shape))
             return inject_str
         
@@ -239,8 +242,7 @@ class Component:
 
         return 'component {} = {}({});\n'.format(
             self.name, self.template.op_name, self.parse_args(self.template.args, self.args))
-
-    # TODO: fix inject_main
+    
     def inject_main(self, prevComponent: Component = None, lastComponent: bool = False):
         inject_str = ''
         for signal in self.inputs:
@@ -291,7 +293,6 @@ class Circuit:
             inject_str += component.inject_component()
         return inject_str
     
-    # TODO: fix inject_main
     def inject_main(self):
         inject_str = self.components[0].inject_main()
         for i in range(1, len(self.components)):
