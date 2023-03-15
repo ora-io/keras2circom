@@ -76,7 +76,7 @@ def transpile_layer(layer: Layer, last: bool = False) -> typing.List[Component]:
 
     if layer.op == 'Lambda':
         s = SequenceMatcher(None, layer.config['function'][0], poly_activation)
-        if s.ratio() < 0.99:
+        if s.ratio() < 0.95:
             raise ValueError('Only polynomial activation functions are supported')
         return transpile_Poly(layer)
     
