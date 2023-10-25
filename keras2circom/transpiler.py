@@ -3,9 +3,6 @@ from .model import *
 
 import os
 
-from difflib import SequenceMatcher
-poly_activation = '4wEAAAAAAAAAAAAAAAEAAAACAAAAQwAAAHMMAAAAfABkARMAfAAXAFMAKQJO6QIAAACpACkB2gF4\ncgIAAAByAgAAAHpOL3Zhci9mb2xkZXJzL2d0L3NnM3Y4cmQxM2w1Mmp4OTFtZmJnemJmYzAwMDBn\nbi9UL2lweWtlcm5lbF8xNTU3MS8yMTc2NzAzOTE5LnB52gg8bGFtYmRhPggAAADzAAAAAA==\n'
-
 def transpile(filename: str, output_dir: str = 'output', raw: bool = False) -> Circuit:
     ''' Transpile a Keras model to a CIRCOM circuit.'''
     
@@ -73,12 +70,6 @@ def transpile_layer(layer: Layer, last: bool = False) -> typing.List[Component]:
         
     if layer.op == 'GlobalMaxPooling2D':
         return transpile_GlobalMaxPooling2D(layer)
-
-    if layer.op == 'Lambda':
-        s = SequenceMatcher(None, layer.config['function'][0], poly_activation)
-        if s.ratio() < 0.99:
-            raise ValueError('Only polynomial activation functions are supported')
-        return transpile_Poly(layer)
     
     if layer.op == 'MaxPooling2D':
         return transpile_MaxPooling2D(layer)
@@ -247,9 +238,6 @@ def transpile_GlobalMaxPooling2D(layer: Layer) -> typing.List[Component]:
         'nCols': layer.input[1],
         'nChannels': layer.input[2],
         })]
-
-def transpile_Poly(layer: Layer) -> typing.List[Component]:
-    return [Component(layer.name, templates['Poly'], [Signal('in', layer.input)], [Signal('out', layer.output)])]
 
 def transpile_MaxPooling2D(layer: Layer) -> typing.List[Component]:
     if layer.config['data_format'] != 'channels_last':

@@ -15,7 +15,6 @@ supported_ops = [
     'Flatten',
     'GlobalAveragePooling2D',
     'GlobalMaxPooling2D',
-    'Lambda', # only for polynomial activation in the form of `Lambda(lambda x: x**2+x)`
     'MaxPooling2D',
     'ReLU',
     'Softmax',
@@ -26,7 +25,6 @@ skip_ops = [
     'InputLayer',
 ]
 
-poly_activation = '4wEAAAAAAAAAAAAAAAEAAAACAAAAQwAAAHMMAAAAfABkARMAfAAXAFMAKQJO6QIAAACpACkB2gF4\ncgIAAAByAgAAAHpOL3Zhci9mb2xkZXJzL2d0L3NnM3Y4cmQxM2w1Mmp4OTFtZmJnemJmYzAwMDBn\nbi9UL2lweWtlcm5lbF8xNTU3MS8yMTc2NzAzOTE5LnB52gg8bGFtYmRhPggAAADzAAAAAA==\n'
 
 # read each layer in a model and convert it to a class called Layer
 @dataclass
