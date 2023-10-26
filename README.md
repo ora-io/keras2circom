@@ -42,10 +42,10 @@ To use the package, you can run the following command:
 python main.py <model_path> [-o <output_dir>] [--raw]
 ```
 
-For example, to transpile the model in `models/best_practice.h5` into a circom circuit, you can run:
+For example, to transpile the model in `models/model.h5` into a circom circuit, you can run:
 
 ```bash
-python main.py models/best_practice.h5
+python main.py models/model.h5
 ```
 
 The output will be in the `output` directory.
@@ -53,7 +53,7 @@ The output will be in the `output` directory.
 If you want to transpile the model into a circom circuit with "raw" output, i.e. no ArgMax at the end, you can run:
 
 ```bash
-python main.py models/best_practice.h5 --raw
+python main.py models/model.h5 --raw
 ```
 
 ## Testing
