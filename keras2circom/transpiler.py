@@ -3,16 +3,16 @@ from .model import *
 
 import os
 
-def transpile(filename: str, output_dir: str = 'output', raw: bool = False) -> Circuit:
+def transpile(filename: str, output_dir: str = 'output', raw: bool = False, dec: int = 18) -> Circuit:
     ''' Transpile a Keras model to a CIRCOM circuit.'''
     
     model = Model(filename, raw)
 
     circuit = Circuit()
     for layer in model.layers[:-1]:
-        circuit.add_components(transpile_layer(layer))
+        circuit.add_components(transpile_layer(layer, dec))
     
-    circuit.add_components(transpile_layer(model.layers[-1], True))
+    circuit.add_components(transpile_layer(model.layers[-1], dec, True))
 
     if raw:
         if circuit.components[-1].template.op_name == 'ArgMax':
@@ -29,7 +29,7 @@ def transpile(filename: str, output_dir: str = 'output', raw: bool = False) -> C
     
     return circuit
 
-def transpile_layer(layer: Layer, last: bool = False) -> typing.List[Component]:
+def transpile_layer(layer: Layer, dec: int = 18, last: bool = False) -> typing.List[Component]:
     ''' Transpile a Keras layer to CIRCOM component(s).'''
     if layer.op == 'Activation':
         if layer.config['activation'] == 'softmax':
