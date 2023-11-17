@@ -124,7 +124,7 @@ class Signal:
 
     def inject_signal(self, comp_name: str) -> str:
         '''inject signal into the beginning of the circuit'''
-        if self.value is not None:
+        if self.value is not None or self.name == 'out' or self.name == 'remainder':
             return 'signal input {}_{}{};\n'.format(
                     comp_name, self.name, parse_shape(self.shape))
         return ''
@@ -132,13 +132,22 @@ class Signal:
     def inject_main(self, comp_name: str, prev_comp_name: str = None, prev_signal: Signal = None) -> str:
         '''inject signal into main'''
         inject_str = ''
-        if self.value is not None:
+        if self.value is not None or self.name == 'out' or self.name == 'remainder':
+            if comp_name.endswith('softmax') and self.name == 'out':
+                inject_str += '{}.out <== {}_out[0];\n'.format(
+                            comp_name, comp_name)
+                return inject_str
             for i in range(len(self.shape)):
                 inject_str += '{}for (var i{} = 0; i{} < {}; i{}++) {{\n'.format(
                             ' '*i*4, i, i, self.shape[i], i)
-            inject_str += '{}{}.{}{} <== {}_{}{};\n'.format(' '*(i+1)*4,
-                        comp_name, self.name, parse_index(self.shape),
-                        comp_name, self.name, parse_index(self.shape))
+            if 'activation' in comp_name or 're_lu' in comp_name:
+                inject_str += '{}{}{}.{} <== {}_{}{};\n'.format(' '*(i+1)*4,
+                            comp_name, parse_index(self.shape), self.name,
+                            comp_name, self.name, parse_index(self.shape))
+            else:
+                inject_str += '{}{}.{}{} <== {}_{}{};\n'.format(' '*(i+1)*4,
+                            comp_name, self.name, parse_index(self.shape),
+                            comp_name, self.name, parse_index(self.shape))
             inject_str += '}'*len(self.shape)+'\n'
             return inject_str
         
@@ -149,11 +158,11 @@ class Signal:
             inject_str += '{}for (var i{} = 0; i{} < {}; i{}++) {{\n'.format(
                             ' '*i*4, i, i, self.shape[i], i)
         
-        if 'activation' in comp_name or 're_lu' in comp_name or 'lambda' in comp_name:
+        if 'activation' in comp_name or 're_lu' in comp_name:
             inject_str += '{}{}{}.{} <== {}.{}{};\n'.format(' '*(i+1)*4,
                         comp_name, parse_index(self.shape), self.name,
                         prev_comp_name, prev_signal.name, parse_index(self.shape))
-        elif 'activation' in prev_comp_name or 're_lu' in prev_comp_name or 'lambda' in prev_comp_name:
+        elif 'activation' in prev_comp_name or 're_lu' in prev_comp_name:
             inject_str += '{}{}.{}{} <== {}{}.{};\n'.format(' '*(i+1)*4,
                         comp_name, self.name, parse_index(self.shape),
                         prev_comp_name, parse_index(self.shape), prev_signal.name)
@@ -174,7 +183,7 @@ class Signal:
         '''inject the circuit output signal'''
         if self.value is not None:
             raise ValueError('output signal should not have value')
-        return 'signal output out{};\n'.format(parse_shape(self.shape))
+        return 'signal output out{};\n'.format(parse_shape(self.shape)) 
     
     def inject_input_main(self, comp_name: str) -> str:
         '''inject the circuit input signal into main'''
@@ -206,7 +215,7 @@ class Signal:
             inject_str += '{}for (var i{} = 0; i{} < {}; i{}++) {{\n'.format(
                         ' '*i*4, i, i, self.shape[i], i)
         
-        if 're_lu' in prev_comp_name or 'lambda' in prev_comp_name:
+        if 're_lu' in prev_comp_name:
             inject_str += '{}out{} <== {}{}.{};\n'.format(' '*(i+1)*4,
                         parse_index(self.shape),
                         prev_comp_name, parse_index(self.shape), prev_signal.name)
@@ -236,59 +245,60 @@ class Component:
         '''inject the component signals'''
         inject_str = ''
         for signal in self.inputs:
-            if signal.value is None and prev_comp is None:
+            if signal.name == 'out' or signal.name == 'remainder':
+                inject_str += signal.inject_signal(self.name)
+                if last_comp is True:
+                    inject_str += signal.inject_output_signal()
+            elif signal.value is None and prev_comp is None:
                 inject_str += signal.inject_input_signal()
             elif signal.value is not None:
                 inject_str += signal.inject_signal(self.name)
-        for signal in self.outputs:
-            if signal.value is None and last_comp is True:
-                inject_str += signal.inject_output_signal()
         return inject_str
     
     def inject_component(self) -> str:
         '''inject the component declaration'''
-        if self.weight_scale == 1.0 and self.bias_scale == 1.0:
-            raise ValueError('initiate weight_scale and bias_scale with Circuit.to_json first')
+        # if self.weight_scale == 1.0 and self.bias_scale == 1.0:
+        #     raise ValueError('initiate weight_scale and bias_scale with Circuit.to_json first')
         if self.template.op_name == 'ReLU':
-            inject_str = 'component {}{};\n'.format(self.name, parse_shape(self.outputs[0].shape))
-            for i in range(len(self.outputs[0].shape)):
+            for signal in self.inputs:
+                if signal.name == 'out':
+                    output_signal = signal
+                    break
+            inject_str = 'component {}{};\n'.format(self.name, parse_shape(output_signal.shape))
+            for i in range(len(output_signal.shape)):
                 inject_str += '{}for (var i{} = 0; i{} < {}; i{}++) {{\n'.format(
-                            ' '*i*4, i, i, self.outputs[0].shape[i], i)
+                            ' '*i*4, i, i, output_signal.shape[i], i)
             inject_str += '{}{}{} = ReLU();\n'.format(' '*(i+1)*4,
-                        self.name, parse_index(self.outputs[0].shape))
-            inject_str += '}'*len(self.outputs[0].shape)+'\n'
+                        self.name, parse_index(output_signal.shape))
+            inject_str += '}'*len(output_signal.shape)+'\n'
             return inject_str
-        
-        if self.template.op_name == 'Poly':
-            inject_str = 'component {}{};\n'.format(self.name, parse_shape(self.outputs[0].shape))
-            for i in range(len(self.outputs[0].shape)):
-                inject_str += '{}for (var i{} = 0; i{} < {}; i{}++) {{\n'.format(
-                            ' '*i*4, i, i, self.outputs[0].shape[i], i)
-            inject_str += '{}{}{} = Poly({:.0f});\n'.format(' '*(i+1)*4,
-                        self.name, parse_index(self.outputs[0].shape), round(self.bias_scale**.5))
-            inject_str += '}'*len(self.outputs[0].shape)+'\n'
-            return inject_str
-        
-        if 'scaledInvPoolSize' in self.template.args:
-            self.args['scaledInvPoolSize'] = max(1.0, round(self.args['scaledInvPoolSize']*self.weight_scale))
-        
-        if 'scaledInv' in self.template.args:
-            self.args['scaledInv'] = max(1.0, round(self.args['scaledInv']*self.weight_scale))
 
         return 'component {} = {}({});\n'.format(
             self.name, self.template.op_name, self.parse_args(self.template.args, self.args))
     
     def inject_main(self, prev_comp: Component = None, last_comp: bool = False) -> str:
+        # TODO: fix this
         '''inject the component main'''
         inject_str = ''
         for signal in self.inputs:
-            if signal.value is not None:
+            if signal.value is not None or signal.name == 'out' or signal.name == 'remainder':
                 inject_str += signal.inject_main(self.name)
             elif prev_comp is None:
                 inject_str += signal.inject_input_main(self.name)
             else:
-                inject_str += signal.inject_main(self.name, prev_comp.name, prev_comp.outputs[0])
+                for sig in prev_comp.inputs:
+                    if sig.name == 'out':
+                        output_signal = sig
+                        break
+                if output_signal is None:
+                    output_signal = prev_comp.outputs[0]
+                inject_str += signal.inject_main(self.name, prev_comp.name, output_signal)
+                print
         if last_comp:
+            for signal in self.inputs:
+                if signal.name == 'out':
+                    inject_str += signal.inject_output_main(self.name, signal)
+                    break
             for signal in self.outputs:
                 inject_str += signal.inject_output_main(self.name, signal)
         return inject_str
