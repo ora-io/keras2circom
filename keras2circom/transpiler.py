@@ -22,12 +22,11 @@ def transpile(filename: str, output_dir: str = 'output', raw: bool = False, dec:
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
     
-    # TODO: fix scaling
-    # with open(output_dir + '/circuit.json', 'w') as f:
-    #     f.write(circuit.to_json())
-    
     with open(output_dir + '/circuit.circom', 'w') as f:
         f.write(circuit.to_circom())
+    
+    with open(output_dir + '/circuit.json', 'w') as f:
+        f.write(circuit.to_json(int(dec)))
     
     return circuit
 
@@ -78,7 +77,6 @@ def transpile_layer(layer: Layer, dec: int = 18, last: bool = False) -> typing.L
     
     raise NotImplementedError(f'Layer {layer.op} is not supported yet.')
 
-# TODO: handle scaling
 def transpile_ArgMax(layer: Layer) -> typing.List[Component]:
     return [Component(layer.name, templates['ArgMax'], [Signal('in', layer.output), Signal('out', (1,))], [], {'n': layer.output[0]})]
 

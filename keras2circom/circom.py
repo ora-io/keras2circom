@@ -1,5 +1,4 @@
 # Ref: https://github.com/zk-ml/uchikoma/blob/main/python/uchikoma/circom.py
-
 from __future__ import annotations
 
 import typing
@@ -10,6 +9,8 @@ import json
 from dataclasses import dataclass
 
 import re
+
+p = 21888242871839275222246405745257275088548364400416034343698204186575808495617
 
 class SafeDict(dict):
     def __missing__(self, key):
@@ -257,8 +258,6 @@ class Component:
     
     def inject_component(self) -> str:
         '''inject the component declaration'''
-        # if self.weight_scale == 1.0 and self.bias_scale == 1.0:
-        #     raise ValueError('initiate weight_scale and bias_scale with Circuit.to_json first')
         if self.template.op_name == 'ReLU':
             for signal in self.inputs:
                 if signal.name == 'out':
@@ -277,7 +276,6 @@ class Component:
             self.name, self.template.op_name, self.parse_args(self.template.args, self.args))
     
     def inject_main(self, prev_comp: Component = None, last_comp: bool = False) -> str:
-        # TODO: fix this
         '''inject the component main'''
         inject_str = ''
         for signal in self.inputs:
@@ -303,29 +301,20 @@ class Component:
                 inject_str += signal.inject_output_main(self.name, signal)
         return inject_str
 
-    def to_json(self, weight_scale: float, current_scale: float) -> typing.Dict[str, typing.Any]:
+    def to_json(self, dec: int) -> typing.Dict[str, typing.Any]:
         '''convert the component params to json format'''
-        self.weight_scale = weight_scale
-        self.bias_scale = self.calc_bias_scale(weight_scale, current_scale)
-        # print(self.name, current_scale, self.weight_scale, self.bias_scale)
-
         json_dict = {}
         for signal in self.inputs:
             if signal.value is not None:
                 if signal.name == 'bias' or signal.name == 'b':
-                    # print(signal.value)
-                    json_dict.update({f'{self.name}_{signal.name}': list(map('{:.0f}'.format, (signal.value*self.bias_scale).round().flatten().tolist()))})
+                    scaling = float(10**(2*dec))
                 else:
-                    json_dict.update({f'{self.name}_{signal.name}': list(map('{:.0f}'.format, (signal.value*self.weight_scale).round().flatten().tolist()))})
+                    scaling = float(10**dec)
+                value = [str(int(v*scaling)) for v in signal.value.flatten().tolist()]
+                # TODO: apply mod p after debugging
+                # value = [str(int(v*scaling) % p) for v in signal.value.flatten().tolist()]
+                json_dict.update({f'{self.name}_{signal.name}': value})
         return json_dict
-    
-    def calc_bias_scale(self, weight_scale: float, current_scale: float) -> float:
-        '''calculate the scale factor of the bias of the component'''
-        if self.template.op_name in ['ReLU', 'Flatten2D', 'ArgMax', 'MaxPooling2D', 'GlobalMaxPooling2D']:
-            return current_scale
-        if self.template.op_name == 'Poly':
-            return current_scale * current_scale
-        return weight_scale * current_scale
     
     @staticmethod
     def parse_args(template_args: typing.List[str], args: typing.Dict[str, typing.Any]) -> str:
@@ -385,28 +374,11 @@ class Circuit:
             'brace_right': '}',
         })
 
-    def to_json(self) -> str:
+    def to_json(self, dec: int) -> str:
         '''convert the model weights to json format'''
-        current_scale = 1.0
-        weight_scale = self.calculate_scale()
-
         json_dict = {}
 
         for component in self.components:
-            json_dict.update(component.to_json(weight_scale, current_scale))
-            current_scale = component.calc_bias_scale(weight_scale, current_scale)
-            # print(component.name, current_scale)
+            json_dict.update(component.to_json(dec))
+        
         return json.dumps(json_dict)
-    
-    def calculate_scale(self) -> float:
-        '''calculate the scale factor of the model weights'''
-        current_scale = 1.0
-        weight_scale = 1.0
-        while current_scale < 1e+64: # should be able to go up to 1e+75, but just in case
-            current_scale = 1.0
-            weight_scale *= 10
-            for component in self.components:
-                current_scale = component.calc_bias_scale(weight_scale, current_scale)
-        if weight_scale == 10.0:
-            raise Exception('Model too large to be converted to circom')
-        return weight_scale/10
