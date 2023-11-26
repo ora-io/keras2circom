@@ -28,6 +28,9 @@ def transpile(filename: str, output_dir: str = 'output', raw: bool = False, dec:
     with open(output_dir + '/circuit.json', 'w') as f:
         f.write(circuit.to_json(int(dec)))
     
+    with open(output_dir + '/circuit.py', 'w') as f:
+        f.write(to_py(circuit, int(dec)))
+    
     return circuit
 
 def transpile_layer(layer: Layer, dec: int = 18, last: bool = False) -> typing.List[Component]:
@@ -130,7 +133,7 @@ def transpile_BatchNormalization2D(layer: Layer, dec: int) -> typing.List[Compon
         'nRows': layer.input[0],
         'nCols': layer.input[1],
         'nChannels': layer.input[2],
-        'n': dec,
+        'n': '10**'+dec,
         })]
 
 def transpile_Conv2D(layer: Layer, dec: int) -> typing.List[Component]:
@@ -167,7 +170,7 @@ def transpile_Conv2D(layer: Layer, dec: int) -> typing.List[Component]:
         'nFilters': layer.config['filters'],
         'kernelSize': layer.config['kernel_size'][0],
         'strides': layer.config['strides'][0],
-        'n': dec,
+        'n': '10**'+dec,
         })
     
     if layer.config['activation'] == 'relu':
@@ -193,7 +196,7 @@ def transpile_Dense(layer: Layer, dec: int, last: bool = False) -> typing.List[C
         ],[],{
         'nInputs': layer.input[0],
         'nOutputs': layer.output[0],
-        'n': dec,
+        'n': '10**'+dec,
         })
     
     if layer.config['activation'] == 'relu':
