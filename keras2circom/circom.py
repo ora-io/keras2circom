@@ -9,6 +9,7 @@ import json
 from dataclasses import dataclass
 
 import re
+import numpy as np
 
 class SafeDict(dict):
     def __missing__(self, key):
@@ -233,8 +234,6 @@ class Component:
     outputs: typing.List[Signal]
     # optional args
     args: typing.Dict[str, typing.Any] = None
-    weight_scale: float = 1.0
-    bias_scale: float = 1.0
 
     def inject_include(self) -> str:
         '''include the component template'''
@@ -309,6 +308,9 @@ class Component:
                 else:
                     scaling = float(10**dec)
                 value = [str(int(v*scaling)) for v in signal.value.flatten().tolist()]
+                # reshape the value to match the circom shape
+                if len(signal.shape) > 1:
+                    value = np.array(value).reshape(signal.shape).tolist()
                 json_dict.update({f'{self.name}_{signal.name}': value})
         return json_dict
     
