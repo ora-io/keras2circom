@@ -10,8 +10,6 @@ from dataclasses import dataclass
 
 import re
 
-p = 21888242871839275222246405745257275088548364400416034343698204186575808495617
-
 class SafeDict(dict):
     def __missing__(self, key):
         return '{' + key + '}'
@@ -311,8 +309,6 @@ class Component:
                 else:
                     scaling = float(10**dec)
                 value = [str(int(v*scaling)) for v in signal.value.flatten().tolist()]
-                # TODO: apply mod p after debugging
-                # value = [str(int(v*scaling) % p) for v in signal.value.flatten().tolist()]
                 json_dict.update({f'{self.name}_{signal.name}': value})
         return json_dict
     
