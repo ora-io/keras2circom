@@ -246,7 +246,7 @@ class Component:
         for signal in self.inputs:
             if signal.name == 'out' or signal.name == 'remainder':
                 inject_str += signal.inject_signal(self.name)
-                if last_comp is True:
+                if last_comp is True and signal.name == 'out':
                     inject_str += signal.inject_output_signal()
             elif signal.value is None and prev_comp is None:
                 inject_str += signal.inject_input_signal()
