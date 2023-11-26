@@ -195,4 +195,5 @@ tmp
 .DS_Store
 
 output/
-test/
+X_test/
+y_test.json
