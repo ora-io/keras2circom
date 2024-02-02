@@ -174,7 +174,7 @@ def transpile_Conv2D(layer: Layer, dec: int) -> typing.List[Component]:
         })
     
     if layer.config['activation'] == 'relu':
-        activation = Component(layer.name+'_re_lu', templates['ReLU'], [Signal('in', layer.output)], [Signal('out', layer.output)])
+        activation = Component(layer.name+'_re_lu', templates['ReLU'], [Signal('in', layer.output), Signal('out', layer.output)], [])
         return [conv, activation]
     
     return [conv]
@@ -200,7 +200,7 @@ def transpile_Dense(layer: Layer, dec: int, last: bool = False) -> typing.List[C
         })
     
     if layer.config['activation'] == 'relu':
-        activation = Component(layer.name+'_re_lu', templates['ReLU'], [Signal('in', layer.output)], [Signal('out', layer.output)])
+        activation = Component(layer.name+'_re_lu', templates['ReLU'], [Signal('in', layer.output), Signal('out', layer.output)], [])
         return [dense, activation]
     
     if layer.config['activation'] == 'softmax':
