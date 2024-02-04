@@ -25,11 +25,11 @@ def transpile(filename: str, output_dir: str = 'output', raw: bool = False, dec:
     with open(output_dir + '/circuit.circom', 'w') as f:
         f.write(circuit.to_circom())
     
-    with open(output_dir + '/circuit.json', 'w') as f:
-        f.write(circuit.to_json(int(dec)))
+    # with open(output_dir + '/circuit.json', 'w') as f:
+    #     f.write(circuit.to_json(int(dec)))
     
-    with open(output_dir + '/circuit.py', 'w') as f:
-        f.write(to_py(circuit, int(dec)))
+    # with open(output_dir + '/circuit.py', 'w') as f:
+    #     f.write(to_py(circuit, int(dec)))
     
     return circuit
 
