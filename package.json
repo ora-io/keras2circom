@@ -20,7 +20,7 @@
     "await-exec": "^0.1.2",
     "chai": "^4.3.7",
     "circom_tester": "^0.0.19",
-    "circomlib-ml": "^2.2.0",
+    "circomlib-ml": "^2.3.0",
     "mocha": "^10.2.0"
   }
 }
