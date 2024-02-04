@@ -225,6 +225,20 @@ def transpile_component(component: Component, dec: int) -> str:
         )
         return comp_str+"\n"
     
+    elif component.template.op_name == "MaxPooling2Dsame":
+        comp_str += "    out = MaxPooling2DsameInt({nRows}, {nCols}, {nChannels}, {poolSize}, {strides}, {input})\n".format(
+            nRows=component.args["nRows"],
+            nCols=component.args["nCols"],
+            nChannels=component.args["nChannels"],
+            poolSize=component.args["poolSize"],
+            strides=component.args["strides"],
+            input="out"
+        )
+        comp_str += "    output['{name}_out'] = out\n".format(
+            name=component.name,
+        )
+        return comp_str+"\n"
+    
     elif component.template.op_name == "Flatten2D":
         comp_str += "    out = Flatten2DInt({nRows}, {nCols}, {nChannels}, {input})\n".format(
             nRows=component.args["nRows"],

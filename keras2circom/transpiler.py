@@ -102,7 +102,6 @@ def transpile_LeakyReLU(layer: Layer) -> typing.List[Component]:
         alpha = 2
     else:
         alpha = int(layer.config['alpha']*10)
-    print(layer.config)
     return [Component(layer.name, templates['LeakyReLU'], [Signal('in', layer.output), Signal('out', layer.output), Signal('remainder', layer.output)], [], {'alpha': alpha})]
 
 def transpile_AveragePooling2D(layer: Layer) -> typing.List[Component]:
@@ -285,14 +284,19 @@ def transpile_GlobalMaxPooling2D(layer: Layer) -> typing.List[Component]:
 def transpile_MaxPooling2D(layer: Layer) -> typing.List[Component]:
     if layer.config['data_format'] != 'channels_last':
         raise NotImplementedError('Only data_format="channels_last" is supported')
-    if layer.config['padding'] != 'valid':
-        raise NotImplementedError('Only padding="valid" is supported')
     if layer.config['pool_size'][0] != layer.config['pool_size'][1]:
         raise NotImplementedError('Only pool_size[0] == pool_size[1] is supported')
     if layer.config['strides'][0] != layer.config['strides'][1]:
         raise NotImplementedError('Only strides[0] == strides[1] is supported')
     
-    return [Component(layer.name, templates['MaxPooling2D'], [Signal('in', layer.input), Signal('out', layer.output)], [],{
+
+    
+    if layer.config['padding'] == 'same':
+        template_name = 'MaxPooling2Dsame'
+    else:
+        template_name = 'MaxPooling2D'
+    
+    return [Component(layer.name, templates[template_name], [Signal('in', layer.input), Signal('out', layer.output)], [],{
         'nRows': layer.input[0],
         'nCols': layer.input[1],
         'nChannels': layer.input[2],

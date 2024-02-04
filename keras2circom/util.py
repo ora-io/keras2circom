@@ -130,3 +130,23 @@ def Conv2DsameInt(nRows, nCols, nChannels, nFilters, kernelSize, strides, n, inp
     
     out, remainder = Conv2DInt(nRows + rowPadding, nCols + colPadding, nChannels, nFilters, kernelSize, strides, n, _input, weights, bias)
     return out, remainder
+
+def MaxPooling2DsameInt(nRows, nCols, nChannels, poolSize, strides, input):
+    if nRows % strides == 0:
+        rowPadding = max(poolSize - strides, 0)
+    else:
+        rowPadding = max(poolSize - nRows % strides, 0)
+    if nCols % strides == 0:
+        colPadding = max(poolSize - strides, 0)
+    else:
+        colPadding = max(poolSize - nCols % strides, 0)
+    
+    _input = [[[0 for _ in range(nChannels)] for _ in range(nCols + colPadding)] for _ in range(nRows + rowPadding)]
+
+    for i in range(nRows):
+        for j in range(nCols):
+            for k in range(nChannels):
+                _input[i+rowPadding//2][j+colPadding//2][k] = input[i][j][k]
+    
+    out = MaxPooling2DInt(nRows + rowPadding, nCols + colPadding, nChannels, poolSize, strides, _input)
+    return out
