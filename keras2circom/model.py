@@ -18,6 +18,10 @@ supported_ops = [
     'MaxPooling2D',
     'ReLU',
     'Softmax',
+    # new ops
+    'UpSampling2D',
+    'LeakyReLU',
+    'Reshape',
 ]
 
 skip_ops = [

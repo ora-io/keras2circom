@@ -146,6 +146,27 @@ def transpile_component(component: Component, dec: int) -> str:
         )
         return comp_str+"\n"
     
+    elif component.template.op_name == "Conv2Dsame":
+        comp_str += "    out, remainder = Conv2DsameInt({nRows}, {nCols}, {nChannels}, {nFilters}, {kernelSize}, {strides}, {n}, {input}, {weights}, {bias})\n".format(
+            nRows=component.args["nRows"],
+            nCols=component.args["nCols"],
+            nChannels=component.args["nChannels"],
+            nFilters=component.args["nFilters"],
+            kernelSize=component.args["kernelSize"],
+            strides=component.args["strides"],
+            n=component.args["n"],
+            input="out",
+            weights="circuit['{name}_weights']".format(name=component.name),
+            bias="circuit['{name}_bias']".format(name=component.name),
+        )
+        comp_str += "    output['{name}_out'] = out\n".format(
+            name=component.name,
+        )
+        comp_str += "    output['{name}_remainder'] = remainder\n".format(
+            name=component.name,
+        )
+        return comp_str+"\n"
+    
     elif component.template.op_name == "Dense":
         comp_str += "    out, remainder = DenseInt({nInputs}, {nOutputs}, {n}, {input}, {weights}, {bias})\n".format(
             nInputs=component.args["nInputs"],
@@ -228,6 +249,20 @@ def transpile_component(component: Component, dec: int) -> str:
             name=component.name,
         )
         return comp_str+"\n"
+
+    elif component.template.op_name == "LeakyReLU":
+        nRows, nCols, nChannels = component.inputs[0].shape
+        comp_str += "    out = LeakyReLUInt({nRows}, {nCols}, {nChannels}, {alpha}, {input})\n".format(
+            nRows=nRows,
+            nCols=nCols,
+            nChannels=nChannels,
+            alpha=component.args["alpha"],
+            input="out"
+        )
+        comp_str += "    output['{name}_out'] = out\n".format(
+            name=component.name,
+        )
+        return comp_str+"\n"
     
     elif component.template.op_name == "ArgMax":
         comp_str += "    out = ArgMaxInt(out)\n"
@@ -236,5 +271,30 @@ def transpile_component(component: Component, dec: int) -> str:
         )
         return comp_str+"\n"
     
+    elif component.template.op_name == "Reshape2D":
+        comp_str += "    out = Reshape2DInt({nRows}, {nCols}, {nChannels}, {input})\n".format(
+            nRows=component.args["nRows"],
+            nCols=component.args["nCols"],
+            nChannels=component.args["nChannels"],
+            input="out"
+        )
+        comp_str += "    output['{name}_out'] = out\n".format(
+            name=component.name,
+        )
+        return comp_str+"\n"
+    
+    elif component.template.op_name == "UpSampling2D":
+        comp_str += "    out = UpSampling2DInt({nRows}, {nCols}, {nChannels}, {size}, {input})\n".format(
+            nRows=component.args["nRows"],
+            nCols=component.args["nCols"],
+            nChannels=component.args["nChannels"],
+            size=component.args["size"],
+            input="out"
+        )
+        comp_str += "    output['{name}_out'] = out\n".format(
+            name=component.name,
+        )
+        return comp_str+"\n"
+
     else:
         raise ValueError("Unknown component type: {}".format(component.template.op_name))

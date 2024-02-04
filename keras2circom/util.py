@@ -74,7 +74,7 @@ def GlobalAveragePooling2DInt(nRows, nCols, nChannels, input):
     return out, remainder
 
 def GlobalMaxPooling2DInt(nRows, nCols, nChannels, input):
-    out = [max(int(input[i][j][k]) for i in range(nRows) for j in range(nCols)) for k in range(nChannels)]
+    out = [str(max(int(input[i][j][k])) for i in range(nRows) for j in range(nCols)) for k in range(nChannels)]
     return out
 
 def MaxPooling2DInt(nRows, nCols, nChannels, poolSize, strides, input):
@@ -91,3 +91,42 @@ def ReLUInt(nRows, nCols, nChannels, input):
 
 def ArgMaxInt(input):
     return [input.index(str(max(int(input[i]) for i in range(len(input)))))]
+
+def UpSampling2DInt(nRows, nCols, nChannels, size, input):
+    out = [[[None for _ in range(nChannels)] for _ in range(nCols*size)] for _ in range(nRows*size)]
+    for i in range(nRows):
+        for j in range(nCols):
+            for c in range(nChannels):
+                for k in range(size):
+                    for l in range(size):
+                        out[i*size+k][j*size+l][c] = str(input[i][j][c])
+    return out
+
+def LeakyReLUInt(nRows, nCols, nChannels, alpha, input): # alpha is 10 times the actual alpha
+    out = [[[str(max(int(input[i][j][k]), (int(input[i][j][k])*alpha)//10)) for k in range(nChannels)] for j in range(nCols)] for i in range(nRows)]
+    remainder = [[[0 if int(input[i][j][k]) >= 0 else (int(input[i][j][k])*alpha)%10 for k in range(nChannels)] for j in range(nCols)] for i in range(nRows)]
+    return out, remainder
+
+def Reshape2DInt(nRows, nCols, nChannels, input): # input is a 1D array
+    out = [[[str(int(input[i*nCols*nChannels + j*nChannels + k])) for k in range(nChannels)] for j in range(nCols)] for i in range(nRows)]
+    return out
+
+def Conv2DsameInt(nRows, nCols, nChannels, nFilters, kernelSize, strides, n, input, weights, bias):
+    if nRows % strides == 0:
+        rowPadding = max(kernelSize - strides, 0)
+    else:
+        rowPadding = max(kernelSize - nRows % strides, 0)
+    if nCols % strides == 0:
+        colPadding = max(kernelSize - strides, 0)
+    else:
+        colPadding = max(kernelSize - nCols % strides, 0)
+    
+    _input = [[[0 for _ in range(nChannels)] for _ in range(nCols + colPadding)] for _ in range(nRows + rowPadding)]
+
+    for i in range(nRows):
+        for j in range(nCols):
+            for k in range(nChannels):
+                _input[i+rowPadding//2][j+colPadding//2][k] = input[i][j][k]
+    
+    out, remainder = Conv2DInt(nRows + rowPadding, nCols + colPadding, nChannels, nFilters, kernelSize, strides, n, _input, weights, bias)
+    return out, remainder

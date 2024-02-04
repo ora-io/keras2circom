@@ -44,6 +44,8 @@ def transpile_layer(layer: Layer, dec: int = 18, last: bool = False) -> typing.L
             return transpile_ReLU(layer)
         if layer.config['activation'] == 'linear':
             return []
+        if layer.config['activation'] =='leaky_relu':
+            return transpile_LeakyReLU(layer)
         raise NotImplementedError(f'Activation {layer.config["activation"]} not implemented')
     
     if layer.op == 'Softmax':
@@ -53,6 +55,9 @@ def transpile_layer(layer: Layer, dec: int = 18, last: bool = False) -> typing.L
     
     if layer.op == 'ReLU':
         return transpile_ReLU(layer)
+    
+    if layer.op == 'LeakyReLU':
+        return transpile_LeakyReLU(layer)
 
     if layer.op == 'AveragePooling2D':
         return transpile_AveragePooling2D(layer)
@@ -77,6 +82,12 @@ def transpile_layer(layer: Layer, dec: int = 18, last: bool = False) -> typing.L
     
     if layer.op == 'MaxPooling2D':
         return transpile_MaxPooling2D(layer)
+
+    if layer.op == 'Reshape':
+        return transpile_Reshape2D(layer)
+    
+    if layer.op == 'UpSampling2D':
+        return transpile_UpSampling2D(layer)
     
     raise NotImplementedError(f'Layer {layer.op} is not supported yet.')
 
@@ -85,6 +96,14 @@ def transpile_ArgMax(layer: Layer) -> typing.List[Component]:
 
 def transpile_ReLU(layer: Layer) -> typing.List[Component]:
     return [Component(layer.name, templates['ReLU'], [Signal('in', layer.output), Signal('out', layer.output)], [])]
+
+def transpile_LeakyReLU(layer: Layer) -> typing.List[Component]:
+    if 'alpha' not in layer.config:
+        alpha = 2
+    else:
+        alpha = int(layer.config['alpha']*10)
+    print(layer.config)
+    return [Component(layer.name, templates['LeakyReLU'], [Signal('in', layer.output), Signal('out', layer.output), Signal('remainder', layer.output)], [], {'alpha': alpha})]
 
 def transpile_AveragePooling2D(layer: Layer) -> typing.List[Component]:
     if layer.config['data_format'] != 'channels_last':
@@ -139,8 +158,6 @@ def transpile_BatchNormalization2D(layer: Layer, dec: int) -> typing.List[Compon
 def transpile_Conv2D(layer: Layer, dec: int) -> typing.List[Component]:
     if layer.config['data_format'] != 'channels_last':
         raise NotImplementedError('Only data_format="channels_last" is supported')
-    if layer.config['padding'] != 'valid':
-        raise NotImplementedError('Only padding="valid" is supported')
     if layer.config['strides'][0] != layer.config['strides'][1]:
         raise NotImplementedError('Only strides[0] == strides[1] is supported')
     if layer.config['kernel_size'][0] != layer.config['kernel_size'][1]:
@@ -156,8 +173,12 @@ def transpile_Conv2D(layer: Layer, dec: int) -> typing.List[Component]:
     
     if layer.config['use_bias'] == False:
         layer.weights.append(np.zeros(layer.weights[0].shape[-1]))
-
-    conv = Component(layer.name, templates['Conv2D'], [
+    
+    if layer.config['padding'] == 'same':
+        template_name = 'Conv2Dsame'
+    else:
+        template_name = 'Conv2D'
+    conv = Component(layer.name, templates[template_name], [
         Signal('in', layer.input),
         Signal('weights', layer.weights[0].shape, layer.weights[0]),
         Signal('bias', layer.weights[1].shape, layer.weights[1]),
@@ -175,6 +196,10 @@ def transpile_Conv2D(layer: Layer, dec: int) -> typing.List[Component]:
     
     if layer.config['activation'] == 'relu':
         activation = Component(layer.name+'_re_lu', templates['ReLU'], [Signal('in', layer.output), Signal('out', layer.output)], [])
+        return [conv, activation]
+
+    if layer.config['activation'] == 'leaky_relu':
+        activation = Component(layer.name+'_leaky_re_lu', templates['LeakyReLU'], [Signal('in', layer.output), Signal('out', layer.output), Signal('remainder', layer.output)], [], {'alpha': layer.config['leaky_relu']})
         return [conv, activation]
     
     return [conv]
@@ -201,6 +226,10 @@ def transpile_Dense(layer: Layer, dec: int, last: bool = False) -> typing.List[C
     
     if layer.config['activation'] == 'relu':
         activation = Component(layer.name+'_re_lu', templates['ReLU'], [Signal('in', layer.output), Signal('out', layer.output)], [])
+        return [dense, activation]
+
+    if layer.config['activation'] == 'leaky_relu':
+        activation = Component(layer.name+'_leaky_re_lu', templates['LeakyReLU'], [Signal('in', layer.output), Signal('out', layer.output), Signal('remainder', layer.output)], [], {'alpha': layer.config['leaky_relu']})
         return [dense, activation]
     
     if layer.config['activation'] == 'softmax':
@@ -269,4 +298,30 @@ def transpile_MaxPooling2D(layer: Layer) -> typing.List[Component]:
         'nChannels': layer.input[2],
         'poolSize': layer.config['pool_size'][0],
         'strides': layer.config['strides'][0],
+        })]
+
+def transpile_Reshape2D(layer: Layer) -> typing.List[Component]:
+    if layer.input.__len__() != 1:
+        raise NotImplementedError('Only 1D inputs are supported')
+    if layer.output.__len__() != 3:
+        raise NotImplementedError('Only 2D outputs are supported')
+    
+    return [Component(layer.name, templates['Reshape2D'], [
+        Signal('in', layer.input),
+        Signal('out', layer.output),
+        ],[],{
+        'nRows': layer.output[0],
+        'nCols': layer.output[1],
+        'nChannels': layer.output[2],
+        })]
+
+def transpile_UpSampling2D(layer: Layer) -> typing.List[Component]:
+    if layer.config['data_format'] != 'channels_last':
+        raise NotImplementedError('Only data_format="channels_last" is supported')
+    
+    return [Component(layer.name, templates['UpSampling2D'], [Signal('in', layer.input), Signal('out', layer.output)], [],{
+        'nRows': layer.input[0],
+        'nCols': layer.input[1],
+        'nChannels': layer.input[2],
+        'size': layer.config['size'],
         })]

@@ -140,7 +140,7 @@ class Signal:
             for i in range(len(self.shape)):
                 inject_str += '{}for (var i{} = 0; i{} < {}; i{}++) {{\n'.format(
                             ' '*i*4, i, i, self.shape[i], i)
-            if 'activation' in comp_name or 're_lu' in comp_name:
+            if 'activation' in comp_name or 're_lu' in comp_name or 'leaky_re_lu' in comp_name:
                 inject_str += '{}{}{}.{} <== {}_{}{};\n'.format(' '*(i+1)*4,
                             comp_name, parse_index(self.shape), self.name,
                             comp_name, self.name, parse_index(self.shape))
@@ -158,11 +158,11 @@ class Signal:
             inject_str += '{}for (var i{} = 0; i{} < {}; i{}++) {{\n'.format(
                             ' '*i*4, i, i, self.shape[i], i)
         
-        if 'activation' in comp_name or 're_lu' in comp_name:
+        if 'activation' in comp_name or 're_lu' in comp_name or 'leaky_re_lu' in comp_name:
             inject_str += '{}{}{}.{} <== {}.{}{};\n'.format(' '*(i+1)*4,
                         comp_name, parse_index(self.shape), self.name,
                         prev_comp_name, prev_signal.name, parse_index(self.shape))
-        elif 'activation' in prev_comp_name or 're_lu' in prev_comp_name:
+        elif 'activation' in prev_comp_name or 're_lu' in prev_comp_name  or 'leaky_re_lu' in comp_name:
             inject_str += '{}{}.{}{} <== {}{}.{};\n'.format(' '*(i+1)*4,
                         comp_name, self.name, parse_index(self.shape),
                         prev_comp_name, parse_index(self.shape), prev_signal.name)
@@ -215,7 +215,7 @@ class Signal:
             inject_str += '{}for (var i{} = 0; i{} < {}; i{}++) {{\n'.format(
                         ' '*i*4, i, i, self.shape[i], i)
         
-        if 're_lu' in prev_comp_name:
+        if 're_lu' in prev_comp_name or 'leaky_re_lu' in prev_comp_name:
             inject_str += '{}out{} <== {}{}.{};\n'.format(' '*(i+1)*4,
                         parse_index(self.shape),
                         prev_comp_name, parse_index(self.shape), prev_signal.name)
@@ -266,6 +266,20 @@ class Component:
                             ' '*i*4, i, i, output_signal.shape[i], i)
             inject_str += '{}{}{} = ReLU();\n'.format(' '*(i+1)*4,
                         self.name, parse_index(output_signal.shape))
+            inject_str += '}'*len(output_signal.shape)+'\n'
+            return inject_str
+
+        if self.template.op_name == 'LeakyReLU':
+            for signal in self.inputs:
+                if signal.name == 'out':
+                    output_signal = signal
+                    break
+            inject_str = 'component {}{};\n'.format(self.name, parse_shape(output_signal.shape))
+            for i in range(len(output_signal.shape)):
+                inject_str += '{}for (var i{} = 0; i{} < {}; i{}++) {{\n'.format(
+                            ' '*i*4, i, i, output_signal.shape[i], i)
+            inject_str += '{}{}{} = LeakyReLU({});\n'.format(' '*(i+1)*4,
+                        self.name, parse_index(output_signal.shape), self.parse_args(self.template.args, self.args))
             inject_str += '}'*len(output_signal.shape)+'\n'
             return inject_str
 
