@@ -322,10 +322,14 @@ def transpile_Reshape2D(layer: Layer) -> typing.List[Component]:
 def transpile_UpSampling2D(layer: Layer) -> typing.List[Component]:
     if layer.config['data_format'] != 'channels_last':
         raise NotImplementedError('Only data_format="channels_last" is supported')
+    if layer.config['size'][0] != layer.config['size'][1]:
+        raise NotImplementedError('Only size[0] == size[1] is supported')
+    if layer.config['strides'][0] != layer.config['strides'][1]:
+        raise NotImplementedError('Only strides[0] == strides[1] is supported')
     
     return [Component(layer.name, templates['UpSampling2D'], [Signal('in', layer.input), Signal('out', layer.output)], [],{
         'nRows': layer.input[0],
         'nCols': layer.input[1],
         'nChannels': layer.input[2],
-        'size': layer.config['size'],
+        'size': layer.config['size'][0],
         })]
