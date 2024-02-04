@@ -237,6 +237,7 @@ def transpile_component(component: Component, dec: int) -> str:
         )
         return comp_str+"\n"
     
+    # ! ReLU and LeakyReLU don't work for other dimensions
     elif component.template.op_name == "ReLU":
         nRows, nCols, nChannels = component.inputs[0].shape
         comp_str += "    out = ReLUInt({nRows}, {nCols}, {nChannels}, {input})\n".format(
@@ -250,6 +251,7 @@ def transpile_component(component: Component, dec: int) -> str:
         )
         return comp_str+"\n"
 
+    # ! remainder missing for LeakyReLU
     elif component.template.op_name == "LeakyReLU":
         nRows, nCols, nChannels = component.inputs[0].shape
         comp_str += "    out = LeakyReLUInt({nRows}, {nCols}, {nChannels}, {alpha}, {input})\n".format(
