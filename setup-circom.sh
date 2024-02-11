@@ -7,4 +7,4 @@ cd circom
 cargo build --release
 cargo install --path circom
 
-npm install -g snarkjs@0.4.19
+npm install -g snarkjs@latest
